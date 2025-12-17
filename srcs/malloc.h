@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2025/12/16 21:41:19 by rotrojan         ###   ########.fr       */
+/*   Updated: 2025/12/17 01:13:39 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,7 +25,7 @@ enum e_zone_type
 
 union u_zone
 {
-	/* struct tiny_zone tiny; */
+	struct tiny_zone *tiny;
 	/* struct small_zone small; */
 	/* struct large_zone large; */
 };
