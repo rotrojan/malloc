@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2025/12/17 01:21:37 by rotrojan         ###   ########.fr       */
+/*   Updated: 2025/12/17 02:16:29 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,10 +54,32 @@ static struct tiny_zone *get_usable_zone(void)
 	return current_zone;
 }
 
+/* 
+ * `__builtin_ctzll()` would have been very handy here, bit I am not sure the
+ * assignation allows the use of the compiler builtin fucntions.
+ */
+static uint8_t get_first_free_chunk_idx(struct tiny_zone *zone)
+{
+	uint8_t idx = 0;
+	uint64_t *bitmap =zone->bitmap;
+
+	if (*bitmap == UINT64_MAX)
+		++bitmap;
+
+	while (idx < sizeof(*bitmap))
+	{
+		if (~(*bitmap) & (1 << idx))
+			return idx;
+		++idx;
+	}
+
+	return idx;
+}
+
 void *malloc_tiny(void)
 {
 	struct tiny_zone *current_zone = get_usable_zone();
-	uint8_t index_first_free_block = 1;
+	uint8_t first_free_chunk_idx = get_first_free_chunk_idx(current_zone);
 
-	return current_zone + index_first_free_block * TINY_SIZE_MAX;
+	return current_zone + first_free_chunk_idx * TINY_SIZE_MAX;
 }
