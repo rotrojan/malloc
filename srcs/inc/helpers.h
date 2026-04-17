@@ -1,26 +1,21 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   _malloc.h                                          :+:      :+:    :+:   */
+/*   helpers.h                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/12/28 22:14:24 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/01/13 20:54:51 by rotrojan         ###   ########.fr       */
+/*   Created: 2026/04/17 16:13:10 by rotrojan          #+#    #+#             */
+/*   Updated: 2026/04/17 16:13:26 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef _MALLOC_H
-#define _MALLOC_H
+#ifndef HELPERS_H
+#define HELPERS_H
 
-#include "malloc_tiny.h"
+/* Helper macros. */
+#define ARRAY_SIZE(x) ((sizeof(x)) / (sizeof(*x)))
+#define DIV_CEIL(x, y) (((x) + (y) - 1) / (y))
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
 
-typedef struct zone {
-	s_tiny_zone *tiny;
-	/* struct small_zone small; */
-	/* struct large_zone large; */
-} s_zone;
-
-extern s_zone g_zone;
-
-#endif /* _MALLOC_H */
+#endif /* HELPERS_H */
