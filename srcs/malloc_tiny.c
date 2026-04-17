@@ -6,11 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-<<<<<<< HEAD
 /*   Updated: 2025/12/17 02:16:29 by rotrojan         ###   ########.fr       */
-=======
-/*   Updated: 2025/12/30 18:36:43 by rotrojan         ###   ########.fr       */
->>>>>>> ff13cb3 (Dirty push to transfer from larchtop to 42.)
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,5 +73,5 @@ void *malloc_tiny(void)
 	bitmap_set(current_zone->bitmap, index);
 	--current_zone->available_chunks;
 
-	return (void *)current_zone + index * TINY_CHUNK_SIZE;
+	return (void *)current_zone + index * TINY_SIZE_MAX;
 }
