@@ -32,8 +32,17 @@ clean:
 	$(RM) $(OBJSDIR)
 
 fclean: clean
-	$(RM) $(NAME)
+	$(RM) $(NAME) test
 
 re: fclean all
 
-.PHONY: all clean fclean re
+test: test.c $(NAME)
+	# $(CC) -Wall -Wextra -Werror -fsanitize=address -g3 $^ -o $@
+	$(CC) -Wall -Wextra -Werror -g3 -L. $< -o $@
+
+run_test: test
+	# LD_PRELOAD=./$(NAME),$(shell $(CC) -print-file-name=libasan.so) ./test
+	LD_PRELOAD=./$(NAME) ./test
+	
+
+.PHONY: all clean fclean re run_test
