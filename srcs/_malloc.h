@@ -1,22 +1,35 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   malloc.h                                           :+:      :+:    :+:   */
+/*   _malloc.h                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2025/12/30 18:56:19 by rotrojan         ###   ########.fr       */
+/*   Created: 2025/12/28 22:14:24 by rotrojan          #+#    #+#             */
+/*   Updated: 2026/01/13 17:51:03 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef MALLOC_H
-#define MALLOC_H
+#ifndef _MALLOC_H
+#define _MALLOC_H
+
+#include "malloc_tiny.h"
 
 #include <stddef.h> /* for size_t */
 
-void *malloc(size_t size);
-void  free(void *ptr);
-void *realloc(void *ptr, size_t size);
+enum e_zone_type {
+	TINY,
+	SMALL,
+	LARGE,
+	ZONE_TYPE_MAX
+};
 
-#endif /* MALLOC_H */
+typedef struct zone {
+	s_tiny_zone *tiny;
+	/* struct small_zone small; */
+	/* struct large_zone large; */
+} s_zone;
+
+extern s_zone g_zone;
+
+#endif /* _MALLOC_H */

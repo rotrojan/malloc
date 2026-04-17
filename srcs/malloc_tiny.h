@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2025/12/16 21:12:29 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/01/13 15:39:23 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,7 +15,7 @@
 
 #include <stdint.h>
 
-#define TINY_SIZE_MAX 256
+#define TINY_CHUNK_SIZE 256
 
 /*
  * Most frequently, sysconf(_SC_PAGESIZE) = 4096.
@@ -24,12 +24,11 @@
  */
 #define TINY_ZONE_SIZE (sysconf(_SC_PAGESIZE) * 8)
 
-struct tiny_zone
-{
+typedef struct tiny_zone {
 	struct tiny_zone *next;
-	uint8_t available_chunks;
-	uint64_t bitmap[2];
-};
+	uint8_t           available_chunks;
+	uint64_t          bitmap[2];
+} s_tiny_zone;
 
 void *malloc_tiny(void);
 
