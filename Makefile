@@ -2,7 +2,7 @@ CC = cc
 CFLAGS = -Wall -Wextra -Werror -I.
 AR = ar
 ARFLAGS = rcs
-SRCS = malloc.c malloc_tiny.c
+SRCS = malloc.c malloc_tiny.c bitmap.c
 OBJS = $(SRCS:%.c=$(OBJSDIR)/%.o)
 SRCSDIR = srcs
 OBJSDIR = .objs
