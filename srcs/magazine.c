@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/16 12:58:34 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/17 16:19:00 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/20 14:12:29 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,20 +15,18 @@
 
 #include "libft.h"
 
+#include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <pthread.h>
 
 #define MAGAZINE_SIZE (sysconf(_SC_PAGESIZE))
 
-s_thread_local_storage g_thread_local_storage = {
-	.once_control = PTHREAD_ONCE_INIT
-};
+s_thread_local_storage g_thread_local_storage = { .once_control =
+							  PTHREAD_ONCE_INIT };
 
 static void destroy_magazine(void *mag)
 {
 	munmap(mag, MAGAZINE_SIZE);
-
 }
 
 static void create_keys(void)
@@ -38,14 +36,6 @@ static void create_keys(void)
 }
 
 /*
-static s_magazine *push_magazine(s_magazine **mag_list, s_magazine *mag)
-{
-	mag->next = *mag_list;
-	*mag_list = mag;
-
-	return mag;
-}
-
 static s_magazine *pop_magazine(s_magazine **mag_list, s_magazine *mag)
 {
 	s_magazine **current = mag_list;

@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/16 12:56:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/17 16:16:10 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/20 14:56:09 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,7 +19,7 @@
 
 typedef struct thread_local_storage {
 	pthread_once_t once_control;
-	pthread_key_t key;
+	pthread_key_t  key;
 } s_thread_local_storage;
 
 typedef struct magazine {

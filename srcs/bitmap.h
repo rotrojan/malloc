@@ -56,7 +56,7 @@ size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
  * @warning Asserts if @p range is 0 or exceeds 8 bits.
  * @see bitmap_clear_range
  */
-void   bitmap_set_range(uint64_t *bitmap, size_t index, size_t range);
+void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range);
 
 /**
  * @brief Clears a range of bits in the bitmap to 0.
@@ -73,6 +73,6 @@ void   bitmap_set_range(uint64_t *bitmap, size_t index, size_t range);
  * @warning Asserts if @p range is 0 or exceeds 8 bits.
  * @see bitmap_set_range
  */
-void   bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range);
+void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range);
 
 #endif /* BITMAP_H */

@@ -6,72 +6,128 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2025/12/17 02:16:29 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/20 15:03:00 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "malloc_tiny.h"
 
-#include "_malloc.h"
 #include "bitmap.h"
+#include "magazine.h"
+#include "zone_type.h"
+
+#include "helpers.h"
+#include "libft.h"
 
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
+static s_tiny_zone *add_zone_to_magazine(s_tiny_zone *zone)
+{
+	s_magazine *mag = get_magazine();
+
+	zone->next     = mag->tiny_list;
+	mag->tiny_list = zone;
+
+	mag->tiny_hot = zone;
+
+	return zone;
+}
+
 static struct tiny_zone *new_tiny_zone(void)
 {
-	s_tiny_zone *new_zone = (struct tiny_zone *)mmap(
-		NULL, TINY_ZONE_SIZE, PROT_READ | PROT_WRITE,
-		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	s_tiny_zone *new_zone;
 
-	/* We keep the first chunk for metadatas. */
-	new_zone->available_chunks = 127;
-	new_zone->bitmap[0]        = 1;
-	new_zone->bitmap[1]        = 0;
-	new_zone->next             = NULL;
+	new_zone = (struct tiny_zone *)mmap(NULL, TINY_ZONE_SIZE,
+					    PROT_READ | PROT_WRITE,
+					    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	if (new_zone == NULL)
+		return NULL;
+
+	ft_memset(new_zone, 0, sizeof(*new_zone));
+	new_zone->zone_type             = TINY_ZONE;
+	new_zone->index_next_free_chunk = NB_CHUNKS_TINY_HDR;
+
+	add_zone_to_magazine(new_zone);
 
 	return new_zone;
 }
 
-static struct tiny_zone *get_usable_zone(void)
+s_tiny_zone *get_tiny_zone()
 {
-	s_tiny_zone *current_zone;
+	s_magazine  *mag  = NULL;
+	s_tiny_zone *zone = NULL;
 
-	if (g_zone.tiny == NULL)
-		g_zone.tiny = new_tiny_zone();
-	current_zone = g_zone.tiny;
+	mag = get_magazine();
 
-	while (current_zone->available_chunks == 0) {
-		if (current_zone->next == NULL)
-			current_zone->next = new_tiny_zone();
-		current_zone = current_zone->next;
+	if (mag->tiny_hot == NULL) {
+		zone          = new_tiny_zone();
+		mag->tiny_hot = zone;
+		/* push_zone(mag->tiny_list); */
 	}
 
-	return current_zone;
+	return mag->tiny_hot;
 }
 
-/*
- * `__builtin_ctzll()` would have been very handy here, bit I am not sure the
- * assignation allows the use of the compiler builtin fucntions.
- */
-static uint8_t get_index_first_free_chunk(s_tiny_zone *zone)
+size_t try_zone(size_t needed_chunks, s_tiny_zone *zone)
 {
-	unsigned int index = 0;
-
-	while (index < BITS_PER_WORD && bitmap_is_set(zone->bitmap, index))
-		++index;
-
-	return index;
+	return bitmap_find_consecutive_zeros(zone->in_use,
+					     ARRAY_SIZE(zone->in_use),
+					     needed_chunks,
+					     zone->index_next_free_chunk);
 }
 
-void *malloc_tiny(void)
+void *malloc_tiny(size_t size)
 {
-	s_tiny_zone *current_zone = get_usable_zone();
-	unsigned int index        = get_index_first_free_chunk(current_zone);
+	size_t       needed_chunks;
+	size_t       index;
+	s_tiny_zone *zone;
+	s_magazine  *mag;
 
-	bitmap_set(current_zone->bitmap, index);
-	--current_zone->available_chunks;
+	/**
+	 * If `size == 0`, we still allocate one chunk.
+	 * From `man 3 malloc`: "If size is 0, then malloc() returns a unique
+	 * pointer value that can later be successfully passed to free()".
+	 */
+	needed_chunks = MAX(1, DIV_CEIL(size, TINY_SIZE_MIN));
 
-	return (void *)current_zone + index * TINY_SIZE_MAX;
+	mag  = get_magazine();
+	zone = mag->tiny_hot;
+	if (zone == NULL)
+		goto new_zone;
+
+	/* Try to allocate in hot zone first. */
+	index = try_zone(needed_chunks, zone);
+	if (index != SIZE_MAX)
+		goto out;
+
+	/**
+	 * If hot zone does not have enough space, try other zones in the list.
+	 */
+	for (s_tiny_zone *current = mag->tiny_list; current != NULL;
+	     current              = current->next) {
+		if (current == zone)
+			continue;
+		if (try_zone(needed_chunks, current) != SIZE_MAX) {
+			mag->tiny_hot = current;
+			goto out;
+		}
+	}
+
+new_zone:
+	/* If no zone has enough space, mmap() a new one. */
+	zone = new_tiny_zone();
+	if (zone == NULL)
+		return NULL;
+	index = zone->index_next_free_chunk;
+
+out:
+	bitmap_set_range(zone->in_use, index, needed_chunks);
+	bitmap_set_range(zone->is_start, index, 1);
+	if (index == zone->index_next_free_chunk)
+		zone->index_next_free_chunk += needed_chunks;
+
+	return (void *)zone + index * TINY_SIZE_MIN;
 }
