@@ -7,7 +7,7 @@ ARFLAGS = rcs
 RM = rm -fr
 
 # Files
-SRCS = malloc.c malloc_tiny.c bitmap.c magazine.c
+SRCS = malloc.c malloc_tiny.c bitmap.c magazine.c zone.c
 OBJS = $(SRCS:%.c=$(CACHE_DIR)/%.o)
 DEPS = $(SRCS:%.c=$(CACHE_DIR)/%.d)
 
@@ -62,7 +62,7 @@ fclean:
 re: fclean all
 
 vpath %.h $(shell find $(SRCS_DIR) -type d) $(INCLUDE_DIRS)
-INCS = _malloc.h zone_type.h $(SRCS:%.c=%.h)
+INCS = malloc_state.h helpers.h $(SRCS:%.c=%.h)
 
 norm: $(SRCS) $(INCS)
 	$(FORMAT) $^

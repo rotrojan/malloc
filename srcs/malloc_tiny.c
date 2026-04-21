@@ -6,18 +6,17 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/20 15:03:00 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/21 17:04:27 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "malloc_tiny.h"
 
 #include "bitmap.h"
-#include "magazine.h"
-#include "zone_type.h"
-
 #include "helpers.h"
 #include "libft.h"
+#include "magazine.h"
+#include "zone.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -36,39 +35,17 @@ static s_tiny_zone *add_zone_to_magazine(s_tiny_zone *zone)
 	return zone;
 }
 
-static struct tiny_zone *new_tiny_zone(void)
+static s_tiny_zone *new_tiny_zone()
 {
-	s_tiny_zone *new_zone;
+	s_tiny_zone *zone = new_zone(TINY_ZONE, TINY_ZONE_SIZE);
 
-	new_zone = (struct tiny_zone *)mmap(NULL, TINY_ZONE_SIZE,
-					    PROT_READ | PROT_WRITE,
-					    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	if (new_zone == NULL)
-		return NULL;
+	add_zone_to_magazine(zone);
 
-	ft_memset(new_zone, 0, sizeof(*new_zone));
-	new_zone->zone_type             = TINY_ZONE;
-	new_zone->index_next_free_chunk = NB_CHUNKS_TINY_HDR;
+	ft_memset(zone->in_use, 0, ARRAY_SIZE(zone->in_use));
+	ft_memset(zone->is_start, 0, ARRAY_SIZE(zone->is_start));
+	zone->index_next_free_chunk = NB_CHUNKS_TINY_HDR;
 
-	add_zone_to_magazine(new_zone);
-
-	return new_zone;
-}
-
-s_tiny_zone *get_tiny_zone()
-{
-	s_magazine  *mag  = NULL;
-	s_tiny_zone *zone = NULL;
-
-	mag = get_magazine();
-
-	if (mag->tiny_hot == NULL) {
-		zone          = new_tiny_zone();
-		mag->tiny_hot = zone;
-		/* push_zone(mag->tiny_list); */
-	}
-
-	return mag->tiny_hot;
+	return zone;
 }
 
 size_t try_zone(size_t needed_chunks, s_tiny_zone *zone)

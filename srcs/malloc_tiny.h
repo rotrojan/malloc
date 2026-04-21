@@ -6,14 +6,14 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/20 14:48:50 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/21 16:04:06 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef MALLOC_TINY_H
 #define MALLOC_TINY_H
 
-#include "zone_type.h"
+#include "zone.h"
 
 #include <stddef.h> /* For size_t */
 #include <stdint.h>
@@ -30,8 +30,8 @@
 #define TINY_ZONE_SIZE (sysconf(_SC_PAGESIZE) * 4)
 
 typedef struct tiny_zone {
+	s_zone_hdr        zone_hdr;
 	struct tiny_zone *next;
-	e_zone_type       zone_type;
 	/**
 	 * The granularity of the TINY chunks is 16 bytes (TINY_SIZE_MIN). We
 	 * can store 1024 of them in a TINY zone. These can be represented by a
@@ -39,7 +39,6 @@ typedef struct tiny_zone {
 	 * 1 -> chunk is in use.
 	 * 0 -> chunk is free to use.
 	 */
-	/* TODO: might not be the proper size*/
 	uint64_t in_use[16];
 	uint64_t is_start[16];
 	size_t   index_next_free_chunk;
