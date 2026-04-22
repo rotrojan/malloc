@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/17 22:32:35 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/22 11:32:26 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,8 @@
 
 #include "malloc.h"
 
+#include "free.h"
+#include "libft.h"
 #include "malloc_state.h"
 #include "malloc_tiny.h"
 
@@ -47,7 +49,19 @@ void *malloc(size_t size)
 
 void free(void *ptr)
 {
-	(void)ptr;
+	s_zone_hdr *zone = find_zone(ptr);
+
+	if (zone == NULL)
+		ft_putstr_fd("Fatal: invalid pointer passed to free!\n"
+			     "Pointer does not belong to any zone.\n",
+			     STDERR_FILENO);
+
+	switch (zone->type) {
+	case TINY_ZONE:
+		free_tiny(ptr, zone);
+	default:
+		return;
+	}
 }
 
 void *realloc(void *ptr, size_t size)

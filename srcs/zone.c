@@ -6,19 +6,15 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 15:26:13 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/21 16:36:34 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/22 16:05:57 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "zone.h"
+#include "libft.h"
 
 #include <sys/mman.h>
 #include <unistd.h>
-
-static inline uint64_t compute_checksum(s_zone_hdr *zone)
-{
-	return zone->magic ^ zone->type ^ zone->self ^ zone->size;
-}
 
 void *new_zone(e_zone_type zone_type, size_t size)
 {
@@ -36,4 +32,10 @@ void *new_zone(e_zone_type zone_type, size_t size)
 	new_zone->checksum = compute_checksum(new_zone);
 
 	return new_zone;
+}
+
+void release_zone(s_zone_hdr *zone_hdr)
+{
+	if (munmap(zone_hdr, zone_hdr->size))
+		ft_putstr_fd("Fatal: cannot relase zone!\n", STDERR_FILENO);
 }

@@ -6,18 +6,15 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/28 16:15:20 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/20 15:02:17 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/22 14:06:28 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "bitmap.h"
 
 #include <assert.h> /* for CHAR_BIT */
-#include <limits.h> /* for CHAR_BIT */
 #include <stddef.h> /* for size_t*/
 #include <stdint.h> /* for uint64_t */
-
-#define BITS_PER_WORD (sizeof(uint64_t) * CHAR_BIT)
 
 static inline size_t bitmap_skip_eight(uint64_t window)
 {

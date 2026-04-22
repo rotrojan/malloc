@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/21 17:04:27 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/22 16:13:31 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -102,7 +102,7 @@ new_zone:
 
 out:
 	bitmap_set_range(zone->in_use, index, needed_chunks);
-	bitmap_set_range(zone->is_start, index, 1);
+	bitmap_set_bit(zone->is_start, index);
 	if (index == zone->index_next_free_chunk)
 		zone->index_next_free_chunk += needed_chunks;
 

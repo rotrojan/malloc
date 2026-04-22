@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   zone.h                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/04/21 22:25:53 by rotrojan          #+#    #+#             */
+/*   Updated: 2026/04/22 16:05:24 by rotrojan         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef ZONE_H
 #define ZONE_H
 
@@ -10,7 +22,6 @@ typedef enum zone_type {
 	TINY_ZONE,
 	SMALL_ZONE,
 	LARGE_ZONE,
-	ZONE_TYPE_MAX
 } e_zone_type;
 
 typedef struct zone_hdr {
@@ -21,6 +32,12 @@ typedef struct zone_hdr {
 	uint64_t    checksum;
 } s_zone_hdr;
 
+static inline uint64_t compute_checksum(s_zone_hdr *zone)
+{
+	return zone->magic ^ zone->type ^ zone->self ^ zone->size;
+}
+
 void *new_zone(e_zone_type zone_type, size_t size);
+void  release_zone(s_zone_hdr *zone_hdr);
 
 #endif /* ZONE_H */

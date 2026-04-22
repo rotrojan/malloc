@@ -6,16 +6,61 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/17 18:48:51 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/22 14:05:54 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef BITMAP_H
 #define BITMAP_H
 
+#include <limits.h> /* for CHAR_BIT */
 #include <stddef.h> /* for size_t*/
 #include <stdint.h> /* for uint64_t */
 
+#define BITS_PER_WORD (sizeof(uint64_t) * CHAR_BIT)
+
+/**
+ * @brief        Retrieves the status of a single bit in the bitmap.
+ * @param bitmap Pointer to the array of 64-bit words.
+ * @param index  The absolute bit index to check.
+ * @return       A non-zero value (the bit mask) if the bit is set, or 0 if it
+ *               is cleared.
+ */
+static inline unsigned int bitmap_get_bit(uint64_t *bitmap, size_t index)
+{
+	size_t word_index = index / BITS_PER_WORD;
+	size_t offset     = index % BITS_PER_WORD;
+
+	return bitmap[word_index] & (1ULL << offset);
+}
+
+/**
+ * @brief Clears a single bit (sets it to 0) in the bitmap.
+ * @param bitmap Pointer to the array of 64-bit words.
+ * @param index  The absolute bit index to clear.
+ * @see bitmap_set_bit
+ */
+static inline void bitmap_clear_bit(uint64_t *bitmap, size_t index)
+{
+	size_t word_index = index / BITS_PER_WORD;
+	size_t offset     = index % BITS_PER_WORD;
+
+	bitmap[word_index] &= ~(1ULL << offset);
+}
+
+/**
+ * @brief Sets a single bit (sets it to 1) in the bitmap.
+ * @param bitmap Pointer to the array of 64-bit words.
+ * @param index  The absolute bit index to set.
+ * @see bitmap_clear_bit
+ */
+static inline void bitmap_set_bit(uint64_t *bitmap, size_t index)
+{
+	size_t word_index = index / BITS_PER_WORD;
+	size_t offset     = index % BITS_PER_WORD;
+
+	bitmap[word_index] |= (1ULL << offset);
+}
 /**
  * @brief Finds the first occurrence of a consecutive sequence of zero bits.
  *
@@ -55,6 +100,7 @@ size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
  * @note This operation is performed using a bitwise OR with a generated mask.
  * @warning Asserts if @p range is 0 or exceeds 8 bits.
  * @see bitmap_clear_range
+ * @see bitmap_clear_bit
  */
 void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range);
 
@@ -72,6 +118,7 @@ void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range);
  * @note This operation is performed using a bitwise AND with an inverted mask.
  * @warning Asserts if @p range is 0 or exceeds 8 bits.
  * @see bitmap_set_range
+ * @see bitmap_set_bit
  */
 void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range);
 
