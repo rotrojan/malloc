@@ -37,5 +37,5 @@ void *new_zone(e_zone_type zone_type, size_t size)
 void release_zone(s_zone_hdr *zone_hdr)
 {
 	if (munmap(zone_hdr, zone_hdr->size))
-		ft_putstr_fd("Fatal: cannot relase zone!\n", STDERR_FILENO);
+		ft_dprintf(STDERR_FILENO, "Fatal: cannot relase zone!\n");
 }

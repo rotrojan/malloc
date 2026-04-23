@@ -20,8 +20,9 @@
 #include "malloc_tiny.h"
 
 #include <pthread.h>
-#include <stddef.h>
+#include <stddef.h> /* for size_t */
 #include <sys/resource.h>
+#include <unistd.h> /* for STDERR_FILENO */
 
 s_malloc_state g_malloc_state = { .once_control = PTHREAD_ONCE_INIT };
 
@@ -52,9 +53,9 @@ void free(void *ptr)
 	s_zone_hdr *zone = find_zone(ptr);
 
 	if (zone == NULL)
-		ft_putstr_fd("Fatal: invalid pointer passed to free!\n"
-			     "Pointer does not belong to any zone.\n",
-			     STDERR_FILENO);
+		ft_dprintf(STDERR_FILENO,
+			     "Fatal: invalid pointer passed to free!\n"
+			     "Pointer does not belong to any zone.\n");
 
 	switch (zone->type) {
 	case TINY_ZONE:

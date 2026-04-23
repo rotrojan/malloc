@@ -8,8 +8,7 @@ RM = rm -fr
 # Files
 SRCS = \
   ft_memset.c \
-  ft_strlen.c \
-  ft_putstr_fd.c
+  ft_printf.c
 #   ft_bzero.c \
 #   ft_memcpy.c \
 #   ft_memccpy.c \
