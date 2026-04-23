@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/16 12:56:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/20 14:56:09 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/23 11:42:57 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,7 +23,7 @@ typedef struct thread_local_storage {
 } s_thread_local_storage;
 
 typedef struct magazine {
-	s_tiny_zone *tiny_list;
+	s_zone_hdr  *tiny_list;
 	s_tiny_zone *tiny_hot;
 	/* struct small_list small; */
 	/* struct small_hot small; */

@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 22:25:53 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/22 16:05:24 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/23 11:35:48 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,11 +25,12 @@ typedef enum zone_type {
 } e_zone_type;
 
 typedef struct zone_hdr {
-	uint64_t    magic;
-	e_zone_type type;
-	size_t      size;
-	uintptr_t   self;
-	uint64_t    checksum;
+	uint64_t         magic;
+	e_zone_type      type;
+	size_t           size;
+	uintptr_t        self;
+	uint64_t         checksum;
+	struct zone_hdr *next;
 } s_zone_hdr;
 
 static inline uint64_t compute_checksum(s_zone_hdr *zone)

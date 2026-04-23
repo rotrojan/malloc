@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/22 10:13:29 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/23 11:39:13 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,8 +30,7 @@
 #define TINY_ZONE_SIZE (size_t)(sysconf(_SC_PAGESIZE) * 4)
 
 typedef struct tiny_zone {
-	s_zone_hdr        zone_hdr;
-	struct tiny_zone *next;
+	s_zone_hdr zone_hdr;
 	/**
 	 * The granularity of the TINY chunks is 16 bytes (TINY_SIZE_MIN). We
 	 * can store 1024 of them in a TINY zone. These can be represented by a

@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/22 16:13:31 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/23 16:13:48 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,23 +23,11 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-static s_tiny_zone *add_zone_to_magazine(s_tiny_zone *zone)
-{
-	s_magazine *mag = get_magazine();
-
-	zone->next     = mag->tiny_list;
-	mag->tiny_list = zone;
-
-	mag->tiny_hot = zone;
-
-	return zone;
-}
+#define NO_USABLE_INDEX SIZE_MAX
 
 static s_tiny_zone *new_tiny_zone()
 {
 	s_tiny_zone *zone = new_zone(TINY_ZONE, TINY_ZONE_SIZE);
-
-	add_zone_to_magazine(zone);
 
 	ft_memset(zone->in_use, 0, ARRAY_SIZE(zone->in_use));
 	ft_memset(zone->is_start, 0, ARRAY_SIZE(zone->is_start));
@@ -48,7 +36,7 @@ static s_tiny_zone *new_tiny_zone()
 	return zone;
 }
 
-size_t try_zone(size_t needed_chunks, s_tiny_zone *zone)
+static size_t get_usable_index(size_t needed_chunks, s_tiny_zone *zone)
 {
 	return bitmap_find_consecutive_zeros(zone->in_use,
 					     ARRAY_SIZE(zone->in_use),
@@ -56,12 +44,50 @@ size_t try_zone(size_t needed_chunks, s_tiny_zone *zone)
 					     zone->index_next_free_chunk);
 }
 
+static s_tiny_zone *get_tiny_zone(size_t needed_chunks, size_t *index)
+{
+	s_magazine  *mag;
+	s_tiny_zone *zone;
+
+	mag  = get_magazine();
+	zone = mag->tiny_hot;
+	if (zone == NULL)
+		goto new_zone;
+
+	/* Look into hot zone first. */
+	*index = get_usable_index(needed_chunks, zone);
+	if (*index != NO_USABLE_INDEX)
+		return zone;
+
+	/**
+	 * If hot zone does not have enough space, try other zones in the list.
+	 */
+	for (void *current = mag->tiny_list; current != NULL;
+	     current       = ((s_zone_hdr *)current)->next) {
+		if (current == zone)
+			continue;
+		if (get_usable_index(needed_chunks, current) !=
+		    NO_USABLE_INDEX) {
+			mag->tiny_hot = current;
+			return current;
+		}
+	}
+
+new_zone:
+	/* If no zone has enough space, or if it is the first call to
+	 * malloc_tiny, `mmap()` a new zone. */
+	zone = new_tiny_zone();
+	if (zone == NULL)
+		return NULL;
+	*index = zone->index_next_free_chunk;
+	return zone;
+}
+
 void *malloc_tiny(size_t size)
 {
 	size_t       needed_chunks;
 	size_t       index;
 	s_tiny_zone *zone;
-	s_magazine  *mag;
 
 	/**
 	 * If `size == 0`, we still allocate one chunk.
@@ -69,38 +95,8 @@ void *malloc_tiny(size_t size)
 	 * pointer value that can later be successfully passed to free()".
 	 */
 	needed_chunks = MAX(1, DIV_CEIL(size, TINY_SIZE_MIN));
+	zone          = get_tiny_zone(needed_chunks, &index);
 
-	mag  = get_magazine();
-	zone = mag->tiny_hot;
-	if (zone == NULL)
-		goto new_zone;
-
-	/* Try to allocate in hot zone first. */
-	index = try_zone(needed_chunks, zone);
-	if (index != SIZE_MAX)
-		goto out;
-
-	/**
-	 * If hot zone does not have enough space, try other zones in the list.
-	 */
-	for (s_tiny_zone *current = mag->tiny_list; current != NULL;
-	     current              = current->next) {
-		if (current == zone)
-			continue;
-		if (try_zone(needed_chunks, current) != SIZE_MAX) {
-			mag->tiny_hot = current;
-			goto out;
-		}
-	}
-
-new_zone:
-	/* If no zone has enough space, mmap() a new one. */
-	zone = new_tiny_zone();
-	if (zone == NULL)
-		return NULL;
-	index = zone->index_next_free_chunk;
-
-out:
 	bitmap_set_range(zone->in_use, index, needed_chunks);
 	bitmap_set_bit(zone->is_start, index);
 	if (index == zone->index_next_free_chunk)
