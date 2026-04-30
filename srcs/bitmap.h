@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/22 14:05:54 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/28 16:24:22 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,13 +26,7 @@
  * @return       A non-zero value (the bit mask) if the bit is set, or 0 if it
  *               is cleared.
  */
-static inline unsigned int bitmap_get_bit(uint64_t *bitmap, size_t index)
-{
-	size_t word_index = index / BITS_PER_WORD;
-	size_t offset     = index % BITS_PER_WORD;
-
-	return bitmap[word_index] & (1ULL << offset);
-}
+uint64_t bitmap_get_bit(uint64_t *bitmap, size_t index);
 
 /**
  * @brief Clears a single bit (sets it to 0) in the bitmap.
@@ -40,13 +34,7 @@ static inline unsigned int bitmap_get_bit(uint64_t *bitmap, size_t index)
  * @param index  The absolute bit index to clear.
  * @see bitmap_set_bit
  */
-static inline void bitmap_clear_bit(uint64_t *bitmap, size_t index)
-{
-	size_t word_index = index / BITS_PER_WORD;
-	size_t offset     = index % BITS_PER_WORD;
-
-	bitmap[word_index] &= ~(1ULL << offset);
-}
+void bitmap_clear_bit(uint64_t *bitmap, size_t index);
 
 /**
  * @brief Sets a single bit (sets it to 1) in the bitmap.
@@ -54,36 +42,7 @@ static inline void bitmap_clear_bit(uint64_t *bitmap, size_t index)
  * @param index  The absolute bit index to set.
  * @see bitmap_clear_bit
  */
-static inline void bitmap_set_bit(uint64_t *bitmap, size_t index)
-{
-	size_t word_index = index / BITS_PER_WORD;
-	size_t offset     = index % BITS_PER_WORD;
-
-	bitmap[word_index] |= (1ULL << offset);
-}
-/**
- * @brief Finds the first occurrence of a consecutive sequence of zero bits.
- *
- * This function scans a bitmap (array of uint64_t) to find a range of
- * @p requested bits that are all set to 0. It supports a @p hint to
- * start the search from a specific bit offset and uses an optimized
- * sliding window approach.
- *
- * @param bitmap    Pointer to the array of 64-bit words representing the
- *                  bitmap.
- * @param size      The number of 64-bit words in the bitmap.
- * @param requested The number of consecutive zeros to find (Must be 1-8).
- * @param hint      The bit index at which to start the search.
- *
- * @return The bit index of the start of the first suitable range found,
- * or @c SIZE_MAX if no such range exists or if the hint is out of bounds.
- *
- * @note This function is optimized to skip full words and uses a skip-ahead
- * mechanism via bitmap_skip_eight() to accelerate the search.
- * @warning The function asserts that @p requested is between 1 and 8 bits.
- */
-size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
-				     size_t requested, size_t hint);
+void bitmap_set_bit(uint64_t *bitmap, size_t index);
 
 /**
  * @brief Sets a range of bits in the bitmap to 1.
@@ -121,5 +80,29 @@ void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range);
  * @see bitmap_set_bit
  */
 void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range);
+
+/**
+ * @brief Finds the first occurrence of a consecutive sequence of zero bits.
+ *
+ * This function scans a bitmap (array of uint64_t) to find a range of
+ * @p requested bits that are all set to 0. It supports a @p hint to
+ * start the search from a specific bit offset and uses an optimized
+ * sliding window approach.
+ *
+ * @param bitmap    Pointer to the array of 64-bit words representing the
+ *                  bitmap.
+ * @param size      The number of 64-bit words in the bitmap.
+ * @param requested The number of consecutive zeros to find (Must be 1-8).
+ * @param hint      The bit index at which to start the search.
+ *
+ * @return The bit index of the start of the first suitable range found,
+ * or @c SIZE_MAX if no such range exists or if the hint is out of bounds.
+ *
+ * @note This function is optimized to skip full words and uses a skip-ahead
+ * mechanism via bitmap_skip_eight() to accelerate the search.
+ * @warning The function asserts that @p requested is between 1 and 8 bits.
+ */
+size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
+				     size_t requested, size_t hint);
 
 #endif /* BITMAP_H */

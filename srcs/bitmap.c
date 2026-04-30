@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/28 16:15:20 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/22 14:06:28 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/30 14:10:59 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,63 @@
 #include <assert.h> /* for CHAR_BIT */
 #include <stddef.h> /* for size_t*/
 #include <stdint.h> /* for uint64_t */
+
+
+uint64_t bitmap_get_bit(uint64_t *bitmap, size_t index)
+{
+	size_t word_index = index / BITS_PER_WORD;
+	size_t offset     = index % BITS_PER_WORD;
+
+	return bitmap[word_index] & (1ULL << offset);
+}
+
+void bitmap_set_bit(uint64_t *bitmap, size_t index)
+{
+	size_t word_index = index / BITS_PER_WORD;
+	size_t offset     = index % BITS_PER_WORD;
+
+	bitmap[word_index] |= (1ULL << offset);
+}
+
+void bitmap_clear_bit(uint64_t *bitmap, size_t index)
+{
+	size_t word_index = index / BITS_PER_WORD;
+	size_t offset     = index % BITS_PER_WORD;
+
+	bitmap[word_index] &= ~(1ULL << offset);
+}
+
+void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range)
+{
+	size_t   word_index;
+	size_t   offset;
+	uint64_t mask = (1ULL << range) - 1;
+
+	assert(range > 0 && range <= 8);
+
+	word_index = index / BITS_PER_WORD;
+	offset     = index % BITS_PER_WORD;
+
+	bitmap[word_index] |= mask << offset;
+	if (offset + range > BITS_PER_WORD)
+		bitmap[word_index + 1] |= (mask >> (BITS_PER_WORD - offset));
+}
+
+void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range)
+{
+	size_t   word_index;
+	size_t   offset;
+	uint64_t mask = (1ULL << range) - 1;
+
+	assert(range > 0 && range <= 8);
+
+	word_index = index / BITS_PER_WORD;
+	offset     = index % BITS_PER_WORD;
+
+	bitmap[word_index] &= ~(mask << offset);
+	if (offset + range > BITS_PER_WORD)
+		bitmap[word_index + 1] &= ~(mask >> (BITS_PER_WORD - offset));
+}
 
 static inline size_t bitmap_skip_eight(uint64_t window)
 {
@@ -61,7 +118,7 @@ size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
 		}
 
 		window = bitmap[word_index] >> offset;
-		if (offset + requested > BITS_PER_WORD)
+		if (offset + requested > BITS_PER_WORD && word_index < size - 1)
 			window |= bitmap[word_index + 1]
 				  << (BITS_PER_WORD - offset);
 
@@ -73,36 +130,4 @@ size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
 	}
 
 	return SIZE_MAX;
-}
-
-void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range)
-{
-	size_t   word_index;
-	size_t   offset;
-	uint64_t mask = (1ULL << range) - 1;
-
-	assert(range > 0 && range <= 8);
-
-	word_index = index / BITS_PER_WORD;
-	offset     = index % BITS_PER_WORD;
-
-	bitmap[word_index] |= mask << offset;
-	if (offset + range > BITS_PER_WORD)
-		bitmap[word_index + 1] |= (mask >> (BITS_PER_WORD - offset));
-}
-
-void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range)
-{
-	size_t   word_index;
-	size_t   offset;
-	uint64_t mask = (1ULL << range) - 1;
-
-	assert(range > 0 && range <= 8);
-
-	word_index = index / BITS_PER_WORD;
-	offset     = index % BITS_PER_WORD;
-
-	bitmap[word_index] &= ~(mask << offset);
-	if (offset + range > BITS_PER_WORD)
-		bitmap[word_index + 1] &= ~(mask >> (BITS_PER_WORD - offset));
 }
