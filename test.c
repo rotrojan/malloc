@@ -1,56 +1,91 @@
+#include "libft.h"
+#include "srcs/show_alloc_mem.h"
 #include "malloc.h"
 
-#include <stdio.h>
-#include <unistd.h>
-#include <dlfcn.h>
+void show_alloc_mem(void) __attribute__((weak));
 
-static void print_error(char const *str)
+static inline void *malloc_and_show(char name[], size_t size)
 {
-	int i = 0;
+	void *ptr = malloc(size);
+	ft_printf("%s = %p (%d bytes)\n", name, ptr, size);
 
-	while (str[i])
-		i++;
-	write(1, str, i);
-	write(1, "\n", 1);
+	return ptr;
 }
 
-int main()
+int main(void)
 {
-	void *handle = dlopen("./libft_malloc_x86_64_Linux.so", RTLD_NOW);
-	char *error = dlerror();
+	if (1) {
 
-	if (error)
-	{
-		print_error(error);
-		return -1;
+		void *ptr_array[12560];
+		for (size_t i = 0; i < sizeof(ptr_array) / sizeof(*ptr_array); i++)
+		{
+			ptr_array[i] = malloc(16);
+			if (i == 255 || i == 256)
+				ft_printf("%d: %p\n", i, ptr_array[i]);
+		}
+
+		if (show_alloc_mem) {
+			ft_printf("\nSHOW MEM ALLOC\n");
+			show_alloc_mem();
+		}
+
+		for (size_t i = 0; i < sizeof(ptr_array) /sizeof(*ptr_array); i++) {
+			/* ft_printf("Freeing ptr[%d]\n", i); */
+			free(ptr_array[i]);
+		}
+
+		if (show_alloc_mem) {
+			ft_printf("\nSHOW MEM ALLOC\n");
+			show_alloc_mem();
+		}
 	}
 
-	void *(*my_malloc)(size_t) = dlsym(handle, "malloc");
+	if (0) {
+		void *ptr1 = malloc_and_show("ptr1", 120);
+		void *ptr2 = malloc_and_show("ptr2", 64);
+		void *ptr3 = malloc_and_show("ptr3", 16);
+		void *ptr4 = malloc_and_show("ptr4", 17);
+		void *ptr5 = malloc_and_show("ptr5", 100);
+		void *ptr6 = malloc_and_show("ptr6", 100);
 
-	/* void *ptr_0 = malloc(0); */
-	void *ptr_1 = my_malloc(42);
-	void *ptr_2 = my_malloc(12);
-	void *ptr_3 = my_malloc(234);
-	void *ptr_4 = my_malloc(256);
+		if (show_alloc_mem) {
+			ft_printf("\nSHOW MEM ALLOC\n");
+			show_alloc_mem();
+		}
 
-	dlclose(handle);
+		free(ptr1);
+		ft_printf("ptr1 freed\n");
+		free(ptr3);
+		ft_printf("ptr3 freed\n");
+		free(ptr5);
+		ft_printf("ptr5 freed\n");
 
-	/* printf("ptr_0 = %p\n", ptr_0); */
-	/* printf("size = %ld\n", ptr_1 - ptr_0); */
-	printf("ptr_1 = %p\n", ptr_1);
-	printf("size = %ld\n", ptr_2 - ptr_1);
-	printf("ptr_2 = %p\n", ptr_2);
-	printf("size = %ld\n", ptr_3 - ptr_2);
-	printf("ptr_3 = %p\n", ptr_3);
-	printf("size = %ld\n", ptr_4 - ptr_3);
-	printf("ptr_4 = %p\n", ptr_4);
-	/* printf("ptr_1 = %p\n", ptr_1); */
-	/* printf("size = %ld\n", ptr_2 - ptr_1); */
-	/* printf("ptr_2 = %p\n", ptr_2); */
-	/* printf("size = %ld\n", ptr_3 - ptr_2); */
-	/* printf("ptr_3 = %p\n", ptr_3); */
-	/* printf("size = %ld\n", ptr_4 - ptr_3); */
-	/* printf("ptr_4 = %p\n", ptr_4); */
+		if (show_alloc_mem) {
+			ft_printf("\nSHOW MEM ALLOC\n");
+			show_alloc_mem();
+		}
+
+		ptr1 = malloc_and_show("ptr1", 12);
+		ptr3 = malloc_and_show("ptr3", 90);
+		ptr5 = malloc_and_show("ptr5", 12);
+
+		if (show_alloc_mem) {
+			ft_printf("\nSHOW MEM ALLOC\n");
+			show_alloc_mem();
+		}
+
+		free(ptr1);
+		free(ptr2);
+		free(ptr3);
+		free(ptr4);
+		free(ptr5);
+		free(ptr6);
+
+		if (show_alloc_mem) {
+			ft_printf("\nSHOW MEM ALLOC\n");
+			show_alloc_mem();
+		}
+	}
 
 	return 0;
 }

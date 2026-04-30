@@ -68,8 +68,8 @@ INCS = malloc_state.h helpers.h $(SRCS:%.c=%.h)
 norm: $(SRCS) $(INCS)
 	$(FORMAT) $^
 
-$(TEST_BIN): test.c
-	$(CC) -Wall -Wextra -Werror -g3 $^ -o $@
+$(TEST_BIN): test.c $(LIBFT)/$(LIBFT).a
+	$(CC) -Wall -Wextra -Werror -g3 -Iinclude -Ilibft/include $^ -Llibft -lft -Wl,-rpath,'$$ORIGIN' -o $@
 
 run_test: $(NAME) $(TEST_BIN)
 	LD_PRELOAD=./$(NAME) ./test
