@@ -6,11 +6,12 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/23 16:17:46 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/23 16:58:01 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/25 11:27:56 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <stdarg.h>
+#include <stdint.h>
 #include <unistd.h>
 
 #define BUF_SIZE 1024
@@ -92,6 +93,30 @@ static void buffer_puthex(s_buffer *buffer, unsigned int n, int capital)
 		buffer_putchar(buffer, tmp[i++]);
 }
 
+static void buffer_putptr(s_buffer *buffer, void *ptr)
+{
+	char tmp[2 + sizeof(uintptr_t) * 2 + 1]; /* "0x" + hex digits + NUL */
+	uintptr_t n = (uintptr_t)ptr;
+	int       i = sizeof(tmp) - 1;
+	int       nibble;
+
+	tmp[i] = '\0';
+
+	if (n == 0)
+		return buffer_putstr(buffer, "(nil)");
+
+	while (n > 0) {
+		nibble   = n & 0xF;
+		tmp[--i] = nibble < 10 ? '0' + nibble : 'a' + nibble - 10;
+		n >>= 4;
+	}
+	tmp[--i] = 'x';
+	tmp[--i] = '0';
+
+	while (tmp[i])
+		buffer_putchar(buffer, tmp[i++]);
+}
+
 static void ft_vdprintf(int fd, char const *fmt, va_list ap)
 {
 	s_buffer buffer = {
@@ -119,6 +144,9 @@ static void ft_vdprintf(int fd, char const *fmt, va_list ap)
 			break;
 		case 'X':
 			buffer_puthex(&buffer, va_arg(ap, unsigned int), 1);
+			break;
+		case 'p':
+			buffer_putptr(&buffer, va_arg(ap, void *));
 			break;
 		case '%':
 			buffer_putchar(&buffer, '%');
