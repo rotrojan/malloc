@@ -1,0 +1,133 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   free.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/04/21 17:37:42 by rotrojan          #+#    #+#             */
+/*   Updated: 2026/04/30 15:34:37 by rotrojan         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "free.h"
+#include "bitmap.h"
+#include "helpers.h"
+#include "libft.h"
+#include "malloc_state.h"
+#include "malloc_tiny.h"
+#include "zone.h"
+
+#include <unistd.h>
+
+/*TODO: adapt nb_page*/
+#define NB_PAGE_SMALL_ZONE 4
+
+static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
+{
+	uintptr_t ptr_int  = (uintptr_t)ptr;
+	uintptr_t zone_int = (uintptr_t)zone;
+
+	if (zone->magic != MAGIC)
+		return 0;
+
+	if (zone->self != zone_int)
+		return 0;
+
+	if (zone->type != zone_type)
+		return 0;
+
+	switch (zone_type) {
+	case TINY_ZONE:
+		if (zone->size != TINY_ZONE_SIZE)
+			return 0;
+		break;
+	/* case SMALL_ZONE: */
+	/* 	if (zone->size != SMALL_ZONE_SIZE) */
+	/* 		return 0; */
+	/* case LARGE_ZONE: */
+	/* 	if (zone->size < LARGE_ZONE_MIN_SIZE) */
+	/* 		return 0; */
+	default:
+		return 0;
+	}
+
+	if (ptr_int < zone_int + sizeof(s_zone_hdr) ||
+	    ptr_int > zone_int + zone->size)
+		return 0;
+
+	if (zone->checksum != compute_checksum(zone))
+		return 0;
+
+	return 1;
+}
+
+s_zone_hdr *find_zone(void *ptr)
+{
+	s_zone_hdr *page;
+
+	/* Get the address of the page. */
+	page = (s_zone_hdr *)((uintptr_t)ptr & ~(PAGE_SIZE - 1));
+
+	/* Check if ptr belongs to a TINY or a SMALL zone. */
+	for (int i = 0; i < NB_PAGE_SMALL_ZONE; i++) {
+		if (zone_is_valid(ptr, page, TINY_ZONE))
+			return page;
+		page = (s_zone_hdr *)((uintptr_t)page - PAGE_SIZE);
+	}
+
+	/* Check if ptr belongs to a LARGE zone. */
+	/* zone = ptr - sizeof(s_zone_hdr); */
+	/* if (validate_zone(ptr, zone, LARGE_ZONE)) */
+	/* 	return zone; */
+
+	return NULL;
+}
+
+void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
+{
+	uintptr_t    ptr_int  = (uintptr_t)ptr;
+	s_tiny_zone *zone     = (s_tiny_zone *)zone_hdr;
+	uintptr_t    zone_int = (uintptr_t)zone_hdr;
+	size_t       index;
+	size_t       size;
+
+	if (ptr_int & (TINY_SIZE_MIN - 1))
+		return ft_dprintf(STDERR_FILENO,
+				  "Fatal: invalid pointer passed to free!\n"
+				  "%p: pointer is not alligned.\n",
+				  ptr);
+
+	index = (ptr_int - zone_int) / TINY_SIZE_MIN;
+
+	if (!bitmap_get_bit(zone->in_use, index) ||
+	    !bitmap_get_bit(zone->is_start, index))
+		return ft_dprintf(STDERR_FILENO,
+				  "Fatal: invalid pointer passed to free!\n"
+				  "%p: pointer was never malloced.\n",
+				  ptr);
+
+	size = 1;
+	while (size <= TINY_SIZE_MAX / TINY_SIZE_MIN &&
+	       index + size < BIT_ARRAY_SIZE(zone->in_use) &&
+	       bitmap_get_bit(zone->in_use, index + size) &&
+	       !bitmap_get_bit(zone->is_start, index + size))
+		size++;
+
+	bitmap_clear_range(zone->in_use, index, size);
+	bitmap_clear_bit(zone->is_start, index);
+
+	if (zone->index_next_free_chunk != index + size)
+		return;
+
+	/**
+	 * Adjust index_next_free_chunk. If it becomes equal to its original
+	 * value, then zone is empty and must be `munmapp()`ed.
+	 */
+	while (!bitmap_get_bit(zone->in_use, index)) {
+		index--;
+		if (index == NB_CHUNKS_TINY_HDR)
+			return release_zone(zone_hdr);
+	}
+	zone->index_next_free_chunk = index;
+}

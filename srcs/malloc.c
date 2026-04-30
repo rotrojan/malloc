@@ -57,7 +57,7 @@ void free(void *ptr)
 	if (zone == NULL)
 		ft_dprintf(STDERR_FILENO,
 			     "Fatal: invalid pointer passed to free!\n"
-			     "Pointer does not belong to any zone.\n");
+			     "%p: pointer does not belong to any zone.\n", ptr);
 
 	switch (zone->type) {
 	case TINY_ZONE:
