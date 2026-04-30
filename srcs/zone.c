@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 15:26:13 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/23 17:14:30 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/25 14:12:59 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,6 +26,19 @@ static void push_zone_ordered(s_zone_hdr **zone_list, s_zone_hdr *zone)
 		current = &((*current)->next);
 	zone->next = *current;
 	*current   = zone;
+}
+
+static void pop_zone(s_zone_hdr **zone_list, s_zone_hdr *zone)
+{
+	s_zone_hdr **current = zone_list;
+
+	while (*current != NULL) {
+		if (*current == zone) {
+			*current = (*current)->next;
+			return;
+		}
+		current = &((*current)->next);
+	}
 }
 
 static s_zone_hdr *add_zone_to_magazine(s_zone_hdr *zone)
@@ -76,6 +89,8 @@ void *new_zone(e_zone_type zone_type, size_t size)
 
 void release_zone(s_zone_hdr *zone_hdr)
 {
+	pop_zone(&g_malloc_state.zone_list, zone_hdr);
+
 	if (munmap(zone_hdr, zone_hdr->size))
 		ft_dprintf(STDERR_FILENO, "Fatal: cannot relase zone!\n");
 }
