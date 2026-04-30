@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/22 11:32:26 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/30 11:49:14 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,6 +35,8 @@ static void init_malloc_state(void)
 	g_malloc_state.max_memory =
 		rlim.rlim_cur == RLIM_INFINITY ? SIZE_MAX : rlim.rlim_max;
 	g_malloc_state.current_memory = 0;
+
+	g_malloc_state.page_size = sysconf(_SC_PAGESIZE);
 }
 
 void *malloc(size_t size)

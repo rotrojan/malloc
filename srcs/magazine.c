@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/16 12:58:34 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/20 14:12:29 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/30 12:48:26 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,14 +19,12 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#define MAGAZINE_SIZE (sysconf(_SC_PAGESIZE))
-
 s_thread_local_storage g_thread_local_storage = { .once_control =
 							  PTHREAD_ONCE_INIT };
 
 static void destroy_magazine(void *mag)
 {
-	munmap(mag, MAGAZINE_SIZE);
+	munmap(mag, PAGE_SIZE);
 }
 
 static void create_keys(void)
@@ -57,13 +55,13 @@ static s_magazine *new_magazine(void)
 {
 	s_magazine *mag = NULL;
 
-	if (g_malloc_state.current_memory + MAGAZINE_SIZE >
+	if (g_malloc_state.current_memory + PAGE_SIZE >
 	    g_malloc_state.max_memory)
 		return NULL;
 
-	mag = (s_magazine *)mmap(NULL, MAGAZINE_SIZE, PROT_READ | PROT_WRITE,
+	mag = (s_magazine *)mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE,
 				 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	g_malloc_state.current_memory += MAGAZINE_SIZE;
+	g_malloc_state.current_memory += PAGE_SIZE;
 	pthread_setspecific(g_thread_local_storage.key, mag);
 
 	ft_memset(mag, 0, sizeof(*mag));

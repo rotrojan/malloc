@@ -6,13 +6,14 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/23 11:39:13 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/04/30 11:58:16 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef MALLOC_TINY_H
 #define MALLOC_TINY_H
 
+#include "malloc_state.h"
 #include "zone.h"
 
 #include <stddef.h> /* For size_t */
@@ -27,7 +28,7 @@
  * We want to hold up to a hundred of 128 bytes TINY chunks. We can store 128
  * of these in a 4 pages zone.
  */
-#define TINY_ZONE_SIZE (size_t)(sysconf(_SC_PAGESIZE) * 4)
+#define TINY_ZONE_SIZE (PAGE_SIZE * 4)
 
 typedef struct tiny_zone {
 	s_zone_hdr zone_hdr;
