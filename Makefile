@@ -8,7 +8,7 @@ RM = rm -fr
 
 # Files
 SRCS = malloc.c malloc_tiny.c bitmap.c magazine.c zone.c free.c \
-  show_alloc_mem.c
+  malloc_large.c show_alloc_mem.c
 OBJS = $(SRCS:%.c=$(CACHE_DIR)/%.o)
 DEPS = $(SRCS:%.c=$(CACHE_DIR)/%.d)
 
