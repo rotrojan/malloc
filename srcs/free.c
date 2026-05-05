@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 17:37:42 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/30 15:34:37 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/05 21:39:02 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,23 +37,13 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
 	if (zone->type != zone_type)
 		return 0;
 
-	switch (zone_type) {
-	case TINY_ZONE:
-		if (zone->size != TINY_ZONE_SIZE)
-			return 0;
-		break;
-	/* case SMALL_ZONE: */
-	/* 	if (zone->size != SMALL_ZONE_SIZE) */
-	/* 		return 0; */
-	/* case LARGE_ZONE: */
-	/* 	if (zone->size < LARGE_ZONE_MIN_SIZE) */
-	/* 		return 0; */
-	default:
+	if (zone_type == TINY_ZONE && zone->size != TINY_ZONE_SIZE)
 		return 0;
-	}
+	/* else if (zone_type == SMALL_ZONE && zone->size != SMALL_ZONE_SIZE) */
+	/* return 0; */
 
 	if (ptr_int < zone_int + sizeof(s_zone_hdr) ||
-	    ptr_int > zone_int + zone->size)
+	    ptr_int >= zone_int + zone->size)
 		return 0;
 
 	if (zone->checksum != compute_checksum(zone))
@@ -68,6 +58,10 @@ s_zone_hdr *find_zone(void *ptr)
 
 	/* Get the address of the page. */
 	page = (s_zone_hdr *)((uintptr_t)ptr & ~(PAGE_SIZE - 1));
+	/* Check if ptr belongs to a LARGE zone. */
+
+	if (zone_is_valid(ptr, page, LARGE_ZONE))
+		return page;
 
 	/* Check if ptr belongs to a TINY or a SMALL zone. */
 	for (int i = 0; i < NB_PAGE_SMALL_ZONE; i++) {
@@ -75,11 +69,6 @@ s_zone_hdr *find_zone(void *ptr)
 			return page;
 		page = (s_zone_hdr *)((uintptr_t)page - PAGE_SIZE);
 	}
-
-	/* Check if ptr belongs to a LARGE zone. */
-	/* zone = ptr - sizeof(s_zone_hdr); */
-	/* if (validate_zone(ptr, zone, LARGE_ZONE)) */
-	/* 	return zone; */
 
 	return NULL;
 }
@@ -125,9 +114,9 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 	 * value, then zone is empty and must be `munmapp()`ed.
 	 */
 	while (!bitmap_get_bit(zone->in_use, index)) {
-		index--;
 		if (index == NB_CHUNKS_TINY_HDR)
 			return release_zone(zone_hdr);
+		index--;
 	}
-	zone->index_next_free_chunk = index;
+	zone->index_next_free_chunk = index + 1;
 }
