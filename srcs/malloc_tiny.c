@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/23 16:13:48 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/05 18:59:13 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,6 +28,9 @@
 static s_tiny_zone *new_tiny_zone()
 {
 	s_tiny_zone *zone = new_zone(TINY_ZONE, TINY_ZONE_SIZE);
+
+	if (zone == NULL)
+		return NULL;
 
 	ft_memset(zone->in_use, 0, ARRAY_SIZE(zone->in_use));
 	ft_memset(zone->is_start, 0, ARRAY_SIZE(zone->is_start));
@@ -62,12 +65,12 @@ static s_tiny_zone *get_tiny_zone(size_t needed_chunks, size_t *index)
 	/**
 	 * If hot zone does not have enough space, try other zones in the list.
 	 */
-	for (void *current = mag->tiny_list; current != NULL;
-	     current       = ((s_zone_hdr *)current)->next) {
+	for (s_tiny_zone *current = mag->tiny_list; current != NULL;
+	     current              = current->next) {
 		if (current == zone)
 			continue;
-		if (get_usable_index(needed_chunks, current) !=
-		    NO_USABLE_INDEX) {
+		*index = get_usable_index(needed_chunks, current);
+		if (*index != NO_USABLE_INDEX) {
 			mag->tiny_hot = current;
 			return current;
 		}

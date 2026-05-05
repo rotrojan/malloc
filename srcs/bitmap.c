@@ -16,7 +16,6 @@
 #include <stddef.h> /* for size_t*/
 #include <stdint.h> /* for uint64_t */
 
-
 uint64_t bitmap_get_bit(uint64_t *bitmap, size_t index)
 {
 	size_t word_index = index / BITS_PER_WORD;
