@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/22 14:18:10 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/30 14:37:56 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/05 21:19:32 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,23 @@
 
 #include <stddef.h>
 
+static void print_large_zone(s_zone_hdr *zone, ptrdiff_t *total_alloc)
+{
+	uintptr_t zone_addr = (uintptr_t)zone;
+	uintptr_t start_alloc;
+	uintptr_t end_alloc;
+	ptrdiff_t size_alloc;
+
+	ft_printf("LARGE : %p\n", zone_addr);
+
+	start_alloc = zone_addr + sizeof(s_zone_hdr);
+	end_alloc   = zone_addr + zone->size - 1;
+	size_alloc  = end_alloc - start_alloc + 1;
+	ft_printf("%p - %p : %d bytes\n", start_alloc, end_alloc, size_alloc);
+
+	*total_alloc += size_alloc;
+}
+
 static void print_tiny_zone(s_tiny_zone *zone, ptrdiff_t *total_alloc)
 {
 	size_t    i = NB_CHUNKS_TINY_HDR;
@@ -29,7 +46,7 @@ static void print_tiny_zone(s_tiny_zone *zone, ptrdiff_t *total_alloc)
 	uintptr_t end_alloc;
 	ptrdiff_t size_alloc;
 
-	ft_printf("TINY: %p\n", zone_addr);
+	ft_printf("TINY : %p\n", zone_addr);
 
 	while (i < BIT_ARRAY_SIZE(zone->is_start)) {
 		if (!bitmap_get_bit(zone->is_start, i)) {
@@ -68,7 +85,8 @@ void show_alloc_mem(void)
 			print_tiny_zone((s_tiny_zone *)current, &total_alloc);
 			break;
 		default:
-			return;
+			print_large_zone((s_zone_hdr *)current, &total_alloc);
+			break;
 		}
 		current = current->next;
 	}
