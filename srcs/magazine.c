@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/16 12:58:34 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/30 12:48:26 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/11 14:50:33 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,13 +18,15 @@
 #include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
+;
 s_thread_local_storage g_thread_local_storage = { .once_control =
 							  PTHREAD_ONCE_INIT };
 
 static void destroy_magazine(void *mag)
 {
-	munmap(mag, PAGE_SIZE);
+	int ret = munmap(mag, PAGE_SIZE);
+	if (ret == -1)
+		ft_dprintf(STDERR_FILENO, "Fatal: cannot destroy magazine!\n");
 }
 
 static void create_keys(void)
@@ -33,35 +35,16 @@ static void create_keys(void)
 	pthread_key_create(&g_thread_local_storage.key, &destroy_magazine);
 }
 
-/*
-static s_magazine *pop_magazine(s_magazine **mag_list, s_magazine *mag)
-{
-	s_magazine **current = mag_list;
-
-	while (*current != NULL) {
-		if (*current == mag) {
-			*current = mag->next;
-			mag->next = NULL;
-			return mag;
-		}
-		current = &((*current)->next);
-	}
-
-	return NULL;
-}
-*/
-
 static s_magazine *new_magazine(void)
 {
-	s_magazine *mag = NULL;
-
-	if (g_malloc_state.current_memory + PAGE_SIZE >
-	    g_malloc_state.max_memory)
+	s_magazine *mag =
+		(s_magazine *)mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE,
+				   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (mag == MAP_FAILED) {
+		ft_dprintf(STDERR_FILENO, "Fatal: cannot create magazine!\n");
 		return NULL;
+	}
 
-	mag = (s_magazine *)mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE,
-				 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	g_malloc_state.current_memory += PAGE_SIZE;
 	pthread_setspecific(g_thread_local_storage.key, mag);
 
 	ft_memset(mag, 0, sizeof(*mag));

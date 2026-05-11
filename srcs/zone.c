@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 15:26:13 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/05 19:13:01 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/08 13:51:35 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,7 +32,7 @@ static void push_zone_ordered(s_zone_hdr *zone)
 static void pop_zone(s_zone_hdr *zone)
 {
 	s_zone_hdr **zone_list = &g_malloc_state.zone_list;
-	s_zone_hdr **current = zone_list;
+	s_zone_hdr **current   = zone_list;
 
 	while (*current != NULL) {
 		if (*current == zone) {
@@ -96,12 +96,13 @@ static void remove_zone_from_magazine(s_zone_hdr *zone)
 
 void *new_zone(e_zone_type zone_type, size_t size)
 {
-	s_zone_hdr *new_zone;
-
-	new_zone = (s_zone_hdr *)mmap(NULL, size, PROT_READ | PROT_WRITE,
-				      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	if (new_zone == MAP_FAILED)
+	s_zone_hdr *new_zone =
+		(s_zone_hdr *)mmap(NULL, size, PROT_READ | PROT_WRITE,
+				   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (new_zone == MAP_FAILED) {
+		ft_dprintf(STDERR_FILENO, "Fatal: cannot create zone!\n");
 		return NULL;
+	}
 
 	new_zone->magic    = MAGIC;
 	new_zone->type     = zone_type;
