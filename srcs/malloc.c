@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/05 21:17:12 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/11 14:34:12 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,10 +31,11 @@ static void init_malloc_state(void)
 {
 	struct rlimit rlim;
 
-	getrlimit(RLIMIT_AS, &rlim);
+	if (getrlimit(RLIMIT_AS, &rlim) == 0 && rlim.rlim_cur != RLIM_INFINITY)
+		g_malloc_state.max_memory = rlim.rlim_cur;
+	else
+		g_malloc_state.max_memory = SIZE_MAX;
 
-	g_malloc_state.max_memory =
-		rlim.rlim_cur == RLIM_INFINITY ? SIZE_MAX : rlim.rlim_max;
 	g_malloc_state.current_memory = 0;
 
 	g_malloc_state.page_size = sysconf(_SC_PAGESIZE);
