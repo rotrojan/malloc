@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/05 18:59:13 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/11 13:24:44 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,15 +25,15 @@
 
 #define NO_USABLE_INDEX SIZE_MAX
 
-static s_tiny_zone *new_tiny_zone()
+static s_tiny_zone *new_tiny_zone(void)
 {
 	s_tiny_zone *zone = new_zone(TINY_ZONE, TINY_ZONE_SIZE);
 
 	if (zone == NULL)
 		return NULL;
 
-	ft_memset(zone->in_use, 0, ARRAY_SIZE(zone->in_use));
-	ft_memset(zone->is_start, 0, ARRAY_SIZE(zone->is_start));
+	ft_memset(zone->in_use, 0, sizeof(zone->in_use));
+	ft_memset(zone->is_start, 0, sizeof(zone->is_start));
 	zone->index_next_free_chunk = NB_CHUNKS_TINY_HDR;
 
 	return zone;
@@ -52,7 +52,9 @@ static s_tiny_zone *get_tiny_zone(size_t needed_chunks, size_t *index)
 	s_magazine  *mag;
 	s_tiny_zone *zone;
 
-	mag  = get_magazine();
+	mag = get_magazine();
+	if (mag == NULL)
+		return NULL;
 	zone = mag->tiny_hot;
 	if (zone == NULL)
 		goto new_zone;
@@ -99,11 +101,12 @@ void *malloc_tiny(size_t size)
 	 */
 	needed_chunks = MAX(1, DIV_CEIL(size, TINY_SIZE_MIN));
 	zone          = get_tiny_zone(needed_chunks, &index);
+	if (zone == NULL)
+		return NULL;
 
 	bitmap_set_range(zone->in_use, index, needed_chunks);
 	bitmap_set_bit(zone->is_start, index);
-	if (index == zone->index_next_free_chunk)
-		zone->index_next_free_chunk += needed_chunks;
+	zone->index_next_free_chunk = MIN(zone->index_next_free_chunk, index);
 
-	return (void *)zone + index * TINY_SIZE_MIN;
+	return (void *)((uintptr_t)zone + index * TINY_SIZE_MIN);
 }

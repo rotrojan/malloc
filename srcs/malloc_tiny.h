@@ -6,13 +6,14 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/05 15:51:59 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/08 14:53:58 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef MALLOC_TINY_H
 #define MALLOC_TINY_H
 
+#include "helpers.h"
 #include "malloc_state.h"
 #include "zone.h"
 
