@@ -1,7 +1,7 @@
 # Implicit variables
 CC = cc
 CFLAGS = -Wall -Wextra -Werror -fPIC $(INCLUDE_DIRS:%=-I%) -MMD -MP
-LDFLAGS = -shared -L$(LIBFT) -$(patsubst lib%,l%,$(LIBFT))
+LDFLAGS = -shared -L$(LIBFT) -$(patsubst lib%,l%,$(LIBFT)) -Wl,--wrap=mmap -Wl,--wrap=munmap -lpthread
 AR = ar
 ARFLAGS = rcs
 RM = rm -fr
