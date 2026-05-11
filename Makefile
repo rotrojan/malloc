@@ -8,7 +8,7 @@ RM = rm -fr
 
 # Files
 SRCS = malloc.c malloc_tiny.c bitmap.c magazine.c zone.c free.c \
-  malloc_large.c show_alloc_mem.c
+  malloc_large.c show_alloc_mem.c stat_mmap.c
 OBJS = $(SRCS:%.c=$(CACHE_DIR)/%.o)
 DEPS = $(SRCS:%.c=$(CACHE_DIR)/%.d)
 
@@ -20,6 +20,7 @@ CACHE_DIR = .cache
 # Programs
 MKDIR = mkdir -p
 FORMAT = clang-format -i
+LINK_PRG = ln -sf
 
 LIBFT = libft
 
@@ -31,15 +32,22 @@ ifeq ($(HOSTTYPE),)
 	HOSTTYPE := $(shell uname -m)_$(shell uname -s)
 endif
 
+# Bin / link names
 NAME = libft_malloc_$(HOSTTYPE).so
+SYMLINK = libft_malloc.so
 TEST_BIN = test
 
 vpath %.c $(shell find $(SRCS_DIR) -type d)
 
-all: $(NAME)
+all: $(NAME) $(SYMLINK)
 
 $(NAME): $(OBJS) $(LIBFT)/$(LIBFT).a
 	$(CC) $(OBJS) $(LDFLAGS) -o $@
+
+symlink: $(SYMLINK)
+
+$(SYMLINK): $(NAME)
+	$(LINK_PRG) $< $@
 
 $(CACHE_DIR):
 	$(MKDIR) $@
@@ -54,19 +62,13 @@ FORCE:
 
 clean:
 	$(RM) $(CACHE_DIR)
-	make -C $(LIBFT) $@
+	$(MAKE) -C $(LIBFT) $@
 
 fclean:
-	$(RM) $(CACHE_DIR) $(NAME) $(TEST_BIN)
-	make -C $(LIBFT) $@
+	$(RM) $(CACHE_DIR) $(NAME) $(SYMLINK) $(TEST_BIN)
+	$(MAKE) -C $(LIBFT) $@
 
 re: fclean all
-
-vpath %.h $(shell find $(SRCS_DIR) -type d) $(INCLUDE_DIRS)
-INCS = malloc_state.h helpers.h $(SRCS:%.c=%.h)
-
-norm: $(SRCS) $(INCS)
-	$(FORMAT) $^
 
 $(TEST_BIN): test.c $(LIBFT)/$(LIBFT).a
 	$(CC) -Wall -Wextra -Werror -g3 -Iinclude -Ilibft/include $^ -Llibft -lft -Wl,-rpath,'$$ORIGIN' -o $@
@@ -74,4 +76,4 @@ $(TEST_BIN): test.c $(LIBFT)/$(LIBFT).a
 run_test: $(NAME) $(TEST_BIN)
 	LD_PRELOAD=./$(NAME) ./test
 
-.PHONY: all clean fclean re run_test norm
+.PHONY: all symlink clean fclean re run_test 
