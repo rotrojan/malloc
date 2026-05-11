@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 17:37:42 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/05 21:39:02 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/05/11 14:20:16 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,14 +37,17 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
 	if (zone->type != zone_type)
 		return 0;
 
-	if (zone_type == TINY_ZONE && zone->size != TINY_ZONE_SIZE)
-		return 0;
-	/* else if (zone_type == SMALL_ZONE && zone->size != SMALL_ZONE_SIZE) */
-	/* return 0; */
-
-	if (ptr_int < zone_int + sizeof(s_zone_hdr) ||
-	    ptr_int >= zone_int + zone->size)
-		return 0;
+	if (zone_type == TINY_ZONE) {
+		if (zone->size != TINY_ZONE_SIZE)
+			return 0;
+		if (ptr_int < zone_int + NB_CHUNKS_TINY_HDR * TINY_SIZE_MIN ||
+		    ptr_int >= zone_int + zone->size)
+			return 0;
+	}
+	/* else if (zone_type == SMALL_ZONE) { */
+	/* 	if (zone->size != SMALL_ZONE_SIZE) */
+	/* 		return 0; */
+	/*  } */
 
 	if (zone->checksum != compute_checksum(zone))
 		return 0;
@@ -97,7 +100,7 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 				  ptr);
 
 	size = 1;
-	while (size <= TINY_SIZE_MAX / TINY_SIZE_MIN &&
+	while (size < TINY_SIZE_MAX / TINY_SIZE_MIN &&
 	       index + size < BIT_ARRAY_SIZE(zone->in_use) &&
 	       bitmap_get_bit(zone->in_use, index + size) &&
 	       !bitmap_get_bit(zone->is_start, index + size))
@@ -106,17 +109,12 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 	bitmap_clear_range(zone->in_use, index, size);
 	bitmap_clear_bit(zone->is_start, index);
 
-	if (zone->index_next_free_chunk != index + size)
-		return;
+	zone->index_next_free_chunk = MIN(zone->index_next_free_chunk, index);
 
-	/**
-	 * Adjust index_next_free_chunk. If it becomes equal to its original
-	 * value, then zone is empty and must be `munmapp()`ed.
-	 */
-	while (!bitmap_get_bit(zone->in_use, index)) {
-		if (index == NB_CHUNKS_TINY_HDR)
-			return release_zone(zone_hdr);
-		index--;
+	/* Check if zone is empty. If so, release it. */
+	for (size_t i = 0; i < ARRAY_SIZE(zone->in_use); i++) {
+		if (zone->in_use[i])
+			return;
 	}
-	zone->index_next_free_chunk = index + 1;
+	release_zone(zone_hdr);
 }
