@@ -26,5 +26,5 @@ void *malloc_large(size_t size)
 	if (zone == NULL)
 		return NULL;
 
-	return zone + sizeof(s_zone_hdr);
+	return (char *)zone + sizeof(s_zone_hdr);
 }

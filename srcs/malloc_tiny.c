@@ -108,5 +108,5 @@ void *malloc_tiny(size_t size)
 	bitmap_set_bit(zone->is_start, index);
 	zone->index_next_free_chunk = MIN(zone->index_next_free_chunk, index);
 
-	return (void *)((uintptr_t)zone + index * TINY_SIZE_MIN);
+	return (char *)zone + index * TINY_SIZE_MIN;
 }
