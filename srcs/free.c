@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 17:37:42 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/11 14:20:16 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/10 20:39:06 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,14 +14,12 @@
 #include "bitmap.h"
 #include "helpers.h"
 #include "libft.h"
+#include "malloc_small.h"
 #include "malloc_state.h"
 #include "malloc_tiny.h"
 #include "zone.h"
 
 #include <unistd.h>
-
-/*TODO: adapt nb_page*/
-#define NB_PAGE_SMALL_ZONE 4
 
 static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
 {
@@ -43,11 +41,13 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
 		if (ptr_int < zone_int + NB_CHUNKS_TINY_HDR * TINY_SIZE_MIN ||
 		    ptr_int >= zone_int + zone->size)
 			return 0;
+	} else if (zone_type == SMALL_ZONE) {
+		if (zone->size != SMALL_ZONE_SIZE)
+			return 0;
+		if (ptr_int < zone_int + SMALL_QUANTUM ||
+		    ptr_int >= zone_int + zone->size)
+			return 0;
 	}
-	/* else if (zone_type == SMALL_ZONE) { */
-	/* 	if (zone->size != SMALL_ZONE_SIZE) */
-	/* 		return 0; */
-	/*  } */
 
 	if (zone->checksum != compute_checksum(zone))
 		return 0;
@@ -61,14 +61,16 @@ s_zone_hdr *find_zone(void *ptr)
 
 	/* Get the address of the page. */
 	page = (s_zone_hdr *)((uintptr_t)ptr & ~(PAGE_SIZE - 1));
-	/* Check if ptr belongs to a LARGE zone. */
 
+	/* Check if ptr belongs to a LARGE zone. */
 	if (zone_is_valid(ptr, page, LARGE_ZONE))
 		return page;
 
 	/* Check if ptr belongs to a TINY or a SMALL zone. */
 	for (int i = 0; i < NB_PAGE_SMALL_ZONE; i++) {
 		if (zone_is_valid(ptr, page, TINY_ZONE))
+			return page;
+		if (zone_is_valid(ptr, page, SMALL_ZONE))
 			return page;
 		page = (s_zone_hdr *)((uintptr_t)page - PAGE_SIZE);
 	}
@@ -117,4 +119,21 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 			return;
 	}
 	release_zone(zone_hdr);
+}
+
+void free_small(void *ptr, s_zone_hdr *zone_hdr)
+{
+	size_t        size  = GET_SIZE(CHUNK_HDR(ptr));
+	s_small_zone *zone  = (s_small_zone *)zone_hdr;
+	s_free_list  *freed = NULL;
+
+	PUT_TAG(CHUNK_HDR(ptr), TAG(size, FREE));
+	PUT_TAG(CHUNK_FTR(ptr), TAG(size, FREE));
+
+	freed = coalesce(ptr, zone->bin);
+	size  = GET_SIZE(CHUNK_HDR(freed));
+	if (size == SMALL_ZONE_SIZE - SMALL_QUANTUM)
+		return release_zone(zone_hdr);
+
+	add_to_bin(freed, &zone->bin[BIN_IDX(size)]);
 }

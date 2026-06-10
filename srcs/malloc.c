@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/11 14:34:12 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/09 18:45:37 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,6 +17,7 @@
 #include "free.h"
 #include "libft.h"
 #include "malloc_large.h"
+#include "malloc_small.h"
 #include "malloc_state.h"
 #include "malloc_tiny.h"
 
@@ -49,8 +50,8 @@ void *malloc(size_t size)
 
 	if (size <= TINY_SIZE_MAX)
 		ret = malloc_tiny(size);
-	/* TODO: implement malloc_small() for 128 < size < PAGE_SIZE -
-	 * sizeof(s_zone_hdr) */
+	else if (size <= SMALL_SIZE_MAX)
+		ret = malloc_small(size);
 	else
 		ret = malloc_large(size);
 
@@ -75,6 +76,8 @@ void free(void *ptr)
 	switch (zone->type) {
 	case TINY_ZONE:
 		return free_tiny(ptr, zone);
+	case SMALL_ZONE:
+		return free_small(ptr, zone);
 	default:
 		return release_zone(zone);
 	}

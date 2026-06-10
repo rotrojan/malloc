@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 15:26:13 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/08 13:51:35 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/10 21:17:48 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,22 +45,21 @@ static void pop_zone(s_zone_hdr *zone)
 
 static s_zone_hdr *add_zone_to_magazine(s_zone_hdr *zone)
 {
-	s_magazine  *mag = get_magazine();
-	s_tiny_zone *tiny_zone;
-	/* s_small_zone *small_zone; */
+	s_magazine   *mag = get_magazine();
+	s_tiny_zone  *tiny_zone;
+	s_small_zone *small_zone;
 
 	if (zone->type == TINY_ZONE) {
 		tiny_zone       = (s_tiny_zone *)zone;
 		tiny_zone->next = mag->tiny_list;
 		mag->tiny_list  = tiny_zone;
 		mag->tiny_hot   = tiny_zone;
+	} else if (zone->type == SMALL_ZONE) {
+		small_zone       = (s_small_zone *)zone;
+		small_zone->next = mag->small_list;
+		mag->small_list  = small_zone;
+		mag->small_hot   = small_zone;
 	}
-	/* else if (zone->type == SMALL_ZONE) { */
-	/* 	small_zone = (s_small_zone *)zone; */
-	/* 	small_zone->next = *small_list; */
-	/* 	*small_list      = small_zone; */
-	/* 	*small_hot = small_zone; */
-	/* } */
 
 	return zone;
 }
@@ -81,17 +80,28 @@ static void remove_tiny(s_tiny_zone *zone)
 	mag->tiny_hot = mag->tiny_list;
 }
 
+static void remove_small(s_small_zone *zone)
+{
+	s_magazine    *mag     = get_magazine();
+	s_small_zone **current = &mag->small_list;
+
+	while (*current != NULL) {
+		if (*current == zone) {
+			*current = (*current)->next;
+			break;
+		}
+		current = &((*current)->next);
+	}
+
+	mag->small_hot = mag->small_list;
+}
+
 static void remove_zone_from_magazine(s_zone_hdr *zone)
 {
 	if (zone->type == TINY_ZONE)
 		remove_tiny((s_tiny_zone *)zone);
-
-	/* else if (zone->type == SMALL_ZONE) { */
-	/* 	small_zone = (s_small_zone *)zone; */
-	/* 	small_zone->next = *small_list; */
-	/* 	*small_list      = small_zone; */
-	/* 	*small_hot = small_zone; */
-	/* } */
+	else if (zone->type == SMALL_ZONE)
+		remove_small((s_small_zone *)zone);
 }
 
 void *new_zone(e_zone_type zone_type, size_t size)
