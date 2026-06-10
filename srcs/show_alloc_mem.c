@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/22 14:18:10 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/05 21:19:32 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/10 22:06:02 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 #include "bitmap.h"
 #include "helpers.h"
 #include "libft.h"
+#include "malloc_small.h"
 #include "malloc_state.h"
 #include "malloc_tiny.h"
 
@@ -35,6 +36,25 @@ static void print_large_zone(s_zone_hdr *zone, ptrdiff_t *total_alloc)
 	ft_printf("%p - %p : %d bytes\n", start_alloc, end_alloc, size_alloc);
 
 	*total_alloc += size_alloc;
+}
+
+static void print_small_zone(s_small_zone *zone, ptrdiff_t *total_alloc)
+{
+	uintptr_t zone_addr = (uintptr_t)zone;
+	ptrdiff_t size_alloc;
+	uintptr_t ptr = zone_addr + SMALL_QUANTUM;
+
+	ft_printf("SMALL : %p\n", zone_addr);
+
+	while (ptr < zone_addr + SMALL_ZONE_SIZE) {
+		if (GET_STATE(CHUNK_HDR((char *)ptr)) == IN_USE) {
+			size_alloc = GET_SIZE(CHUNK_HDR((char *)ptr));
+			ft_printf("%p - %p : %d bytes\n", ptr,
+				  ptr + size_alloc - 1, size_alloc);
+			*total_alloc += size_alloc;
+		}
+		ptr = (uintptr_t)NEXT_CHUNK((char *)ptr);
+	}
 }
 
 static void print_tiny_zone(s_tiny_zone *zone, ptrdiff_t *total_alloc)
@@ -84,7 +104,10 @@ void show_alloc_mem(void)
 		case TINY_ZONE:
 			print_tiny_zone((s_tiny_zone *)current, &total_alloc);
 			break;
-		default:
+		case SMALL_ZONE:
+			print_small_zone((s_small_zone *)current, &total_alloc);
+			break;
+		default: /*LARGE_ZONE*/
 			print_large_zone((s_zone_hdr *)current, &total_alloc);
 			break;
 		}
