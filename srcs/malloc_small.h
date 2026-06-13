@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/12 20:08:29 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/10 21:15:08 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/12 12:40:55 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,5 +77,6 @@ void        *malloc_small(size_t size);
 void        *coalesce(void *chunk, s_free_list **bin);
 s_free_list *add_to_bin(s_free_list *chunk, s_free_list **free_list);
 s_free_list *pop_from_bin(s_free_list **free_list);
+void        *resize_chunk(s_free_list *chunk, size_t size, s_free_list **bin);
 
 #endif /* MALLOC_SMALL_H */

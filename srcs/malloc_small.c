@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/13 12:29:46 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/10 20:32:04 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/12 13:05:48 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -171,21 +171,42 @@ s_free_list *pop_from_bin(s_free_list **free_list)
 	return chunk;
 }
 
-static void *split_chunk(s_free_list *chunk, size_t size, s_free_list **bin)
+void *resize_chunk(s_free_list *chunk, size_t new_size, s_free_list **bin)
 {
-	size_t prev_size = GET_SIZE(CHUNK_HDR(chunk));
-	size_t remainder_size;
+	size_t       old_size = GET_SIZE(CHUNK_HDR(chunk));
+	size_t       remainder_size;
+	size_t       combined_size;
+	s_free_list *remainder_chunk;
 
-	PUT_TAG(CHUNK_HDR(chunk), TAG(size, IN_USE));
-	PUT_TAG(CHUNK_FTR(chunk), TAG(size, IN_USE));
+	if (new_size < old_size) {
+		remainder_size = old_size - new_size;
+		goto resize;
+	}
 
-	remainder_size = prev_size - size;
-	PUT_TAG(CHUNK_HDR(NEXT_CHUNK(chunk)), TAG(remainder_size, FREE));
-	PUT_TAG(CHUNK_FTR(NEXT_CHUNK(chunk)), TAG(remainder_size, FREE));
+	if (GET_STATE(CHUNK_HDR(NEXT_CHUNK(chunk))) == IN_USE)
+		return NULL;
 
-	add_to_bin((s_free_list *)NEXT_CHUNK(chunk),
-		   &bin[BIN_IDX(remainder_size)]);
+	combined_size = GET_SIZE(CHUNK_HDR(chunk)) +
+			GET_SIZE(CHUNK_HDR(NEXT_CHUNK(chunk)));
+	if (combined_size < new_size)
+		return NULL;
 
+	remove_from_bin((s_free_list *)NEXT_CHUNK(chunk), bin);
+	remainder_size = combined_size - new_size;
+
+resize:
+	PUT_TAG(CHUNK_HDR(chunk), TAG(new_size, IN_USE));
+	PUT_TAG(CHUNK_FTR(chunk), TAG(new_size, IN_USE));
+
+	if (remainder_size != 0) {
+		remainder_chunk = (s_free_list *)NEXT_CHUNK(chunk);
+		PUT_TAG(CHUNK_HDR(remainder_chunk), TAG(remainder_size, FREE));
+		PUT_TAG(CHUNK_FTR(remainder_chunk), TAG(remainder_size, FREE));
+
+		remainder_chunk = coalesce(remainder_chunk, bin);
+		add_to_bin((s_free_list *)remainder_chunk,
+			   &bin[BIN_IDX(GET_SIZE(CHUNK_HDR(remainder_chunk)))]);
+	}
 	return chunk;
 }
 
@@ -227,8 +248,8 @@ void *malloc_small(size_t size)
 	bin_idx++;
 	while (bin_idx < NB_BINS) {
 		if (bin[bin_idx])
-			return split_chunk(pop_from_bin(&bin[bin_idx]),
-					   real_size, bin);
+			return resize_chunk(pop_from_bin(&bin[bin_idx]),
+					    real_size, bin);
 		bin_idx++;
 	}
 

@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/11 13:24:44 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/13 15:59:06 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -86,6 +86,20 @@ new_zone:
 		return NULL;
 	*index = zone->index_next_free_chunk;
 	return zone;
+}
+
+size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone)
+{
+	size_t size  = 1;
+	size_t index = (ptr - (char *)zone) / TINY_SIZE_MIN;
+
+	while (size < TINY_SIZE_MAX / TINY_SIZE_MIN &&
+	       index + size < BIT_ARRAY_SIZE(zone->in_use) &&
+	       bitmap_get_bit(zone->in_use, index + size) &&
+	       !bitmap_get_bit(zone->is_start, index + size))
+		size++;
+
+	return size;
 }
 
 void *malloc_tiny(size_t size)

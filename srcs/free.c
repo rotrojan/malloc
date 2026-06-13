@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 17:37:42 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/10 20:39:06 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/13 15:58:26 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -101,12 +101,7 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 				  "%p: pointer was never malloced.\n",
 				  ptr);
 
-	size = 1;
-	while (size < TINY_SIZE_MAX / TINY_SIZE_MIN &&
-	       index + size < BIT_ARRAY_SIZE(zone->in_use) &&
-	       bitmap_get_bit(zone->in_use, index + size) &&
-	       !bitmap_get_bit(zone->is_start, index + size))
-		size++;
+	size = get_nb_chunks_tiny_alloc(ptr, zone);
 
 	bitmap_clear_range(zone->in_use, index, size);
 	bitmap_clear_bit(zone->is_start, index);

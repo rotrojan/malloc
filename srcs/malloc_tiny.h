@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/08 14:53:58 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/13 15:58:06 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -46,6 +46,7 @@ typedef struct tiny_zone {
 	size_t   index_next_free_chunk;
 } s_tiny_zone;
 
-void *malloc_tiny(size_t size);
+void  *malloc_tiny(size_t size);
+size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone);
 
 #endif /* MALLOC_TINY_H */
