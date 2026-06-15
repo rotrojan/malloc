@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/13 16:08:36 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 15:07:08 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -193,6 +193,21 @@ new_alloc:
 	return new_ptr;
 }
 
+void *calloc(size_t n, size_t size)
+{
+	void  *ptr;
+	size_t total;
+
+	if (n != 0 && size > SIZE_MAX / n)
+		return NULL;
+
+	total = n * size;
+	ptr   = malloc(total);
+	if (ptr != NULL)
+		ft_memset(ptr, 0, total);
+	return ptr;
+}
+
 void *realloc(void *ptr, size_t size)
 {
 	s_zone_hdr *zone;
@@ -224,4 +239,12 @@ void *realloc(void *ptr, size_t size)
 	default:
 		return realloc_large(ptr, size, zone);
 	}
+}
+
+void *reallocarray(void *ptr, size_t n, size_t size)
+{
+	if (n != 0 && size > SIZE_MAX / n)
+		return (NULL);
+
+	return (realloc(ptr, n * size));
 }
