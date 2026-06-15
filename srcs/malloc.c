@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 15:43:18 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 18:14:47 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -83,21 +83,6 @@ void free(void *ptr)
 	}
 }
 
-void *calloc(size_t n, size_t size)
-{
-	void  *ptr;
-	size_t total;
-
-	if (n != 0 && size > SIZE_MAX / n)
-		return NULL;
-
-	total = n * size;
-	ptr   = malloc(total);
-	if (ptr != NULL)
-		ft_memset(ptr, 0, total);
-	return ptr;
-}
-
 void *realloc(void *ptr, size_t size)
 {
 	s_zone_hdr *zone;
@@ -131,10 +116,38 @@ void *realloc(void *ptr, size_t size)
 	}
 }
 
-void *reallocarray(void *ptr, size_t n, size_t size)
-{
-	if (n != 0 && size > SIZE_MAX / n)
-		return (NULL);
-
-	return (realloc(ptr, n * size));
-}
+/*
+ * calloc and reallocarray are intentionally not implemented.
+ *
+ * Exporting either symbol via LD_PRELOAD causes any library in the process
+ * (e.g. nss-systemd during `ls -la` group-name resolution) that calls
+ * `calloc()` to receive a pointer from our heap. When glibc later inspects that
+ * pointer through `malloc_usable_size()` — which it calls internally before
+ * deciding whether to realloc — it tries to parse it as a glibc chunk header
+ * and crashes. The subject only requires `malloc()`, `free()` and `realloc()`,
+ * so the simplest correct fix is to leave these symbols unimplemented and let
+ * the dynamic linker fall through to glibc.
+ *
+ * void *calloc(size_t n, size_t size)
+ * {
+ * 	void  *ptr;
+ * 	size_t total;
+ *
+ * 	if (n != 0 && size > SIZE_MAX / n)
+ * 		return NULL;
+ *
+ * 	total = n * size;
+ * 	ptr   = malloc(total);
+ * 	if (ptr != NULL)
+ * 		ft_memset(ptr, 0, total);
+ * 	return ptr;
+ * }
+ *
+ * void *reallocarray(void *ptr, size_t n, size_t size)
+ * {
+ * 	if (n != 0 && size > SIZE_MAX / n)
+ * 		return (NULL);
+ *
+ * 	return (realloc(ptr, n * size));
+ * }
+ */
