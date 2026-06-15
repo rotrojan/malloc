@@ -1,19 +1,20 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   malloc_small.c                                     :+:      :+:    :+:   */
+/*   small.c                                            :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/13 12:29:46 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/12 13:05:48 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 15:41:41 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "malloc_small.h"
+#include "small.h"
 
 #include "libft.h"
 #include "magazine.h"
+#include "malloc.h"
 #include "zone.h"
 
 #include <stddef.h>
@@ -118,7 +119,7 @@ static void remove_from_bin(s_free_list *chunk, s_free_list **bins)
 	*current = ((*current)->next);
 }
 
-void *coalesce(void *chunk, s_free_list **bins)
+static void *coalesce(void *chunk, s_free_list **bins)
 {
 	int    prev_state = GET_STATE(CHUNK_HDR(PREV_CHUNK(chunk)));
 	int    next_state = GET_STATE(CHUNK_HDR(NEXT_CHUNK(chunk)));
@@ -154,7 +155,7 @@ void *coalesce(void *chunk, s_free_list **bins)
 	return chunk;
 }
 
-s_free_list *add_to_bin(s_free_list *chunk, s_free_list **free_list)
+static s_free_list *add_to_bin(s_free_list *chunk, s_free_list **free_list)
 {
 	chunk->next = *free_list;
 	*free_list  = chunk;
@@ -162,7 +163,7 @@ s_free_list *add_to_bin(s_free_list *chunk, s_free_list **free_list)
 	return chunk;
 }
 
-s_free_list *pop_from_bin(s_free_list **free_list)
+static s_free_list *pop_from_bin(s_free_list **free_list)
 {
 	s_free_list *chunk = *free_list;
 
@@ -171,7 +172,8 @@ s_free_list *pop_from_bin(s_free_list **free_list)
 	return chunk;
 }
 
-void *resize_chunk(s_free_list *chunk, size_t new_size, s_free_list **bin)
+static void *resize_chunk(s_free_list *chunk, size_t new_size,
+			  s_free_list **bin)
 {
 	size_t       old_size = GET_SIZE(CHUNK_HDR(chunk));
 	size_t       remainder_size;
@@ -254,4 +256,50 @@ void *malloc_small(size_t size)
 	}
 
 	return NULL;
+}
+
+void free_small(void *ptr, s_zone_hdr *zone_hdr)
+{
+	size_t        size  = GET_SIZE(CHUNK_HDR(ptr));
+	s_small_zone *zone  = (s_small_zone *)zone_hdr;
+	s_free_list  *freed = NULL;
+
+	/* TODO: add checks alike to free_tiny (check state, check modulo 256 */
+	PUT_TAG(CHUNK_HDR(ptr), TAG(size, FREE));
+	PUT_TAG(CHUNK_FTR(ptr), TAG(size, FREE));
+
+	freed = coalesce(ptr, zone->bin);
+	size  = GET_SIZE(CHUNK_HDR(freed));
+	if (size == SMALL_ZONE_SIZE - SMALL_QUANTUM)
+		return release_zone(zone_hdr);
+
+	add_to_bin(freed, &zone->bin[BIN_IDX(size)]);
+}
+
+void *realloc_small(void *ptr, size_t size, s_zone_hdr *zone_hdr)
+{
+	void         *new_ptr;
+	size_t        old_size  = GET_SIZE(CHUNK_HDR(ptr));
+	size_t        real_size = (size + 2 * TAG_SIZE + SMALL_QUANTUM - 1) &
+				  ~(SMALL_QUANTUM - 1);
+	s_small_zone *zone      = (s_small_zone *)zone_hdr;
+
+	if (size <= TINY_SIZE_MAX || size > SMALL_SIZE_MAX)
+		goto new_alloc;
+
+	if (old_size == real_size)
+		return ptr;
+
+	if (resize_chunk(ptr, real_size, zone->bin) != NULL)
+		/* Because `resize_chunk()` returns ptr on success.*/
+		return ptr;
+
+new_alloc:
+	new_ptr = malloc(size);
+	if (new_ptr == NULL)
+		return NULL;
+	ft_memcpy(new_ptr, ptr,
+		  MIN(size, GET_SIZE(CHUNK_HDR(ptr)) - 2 * TAG_SIZE));
+	free(ptr);
+	return new_ptr;
 }

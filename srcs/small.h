@@ -1,17 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   malloc_small.h                                     :+:      :+:    :+:   */
+/*   small.h                                            :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/12 20:08:29 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/12 12:40:55 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 16:07:43 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef MALLOC_SMALL_H
-#define MALLOC_SMALL_H
+#ifndef SMALL_H
+#define SMALL_H
 
 #include "helpers.h"
 #include "malloc_state.h"
@@ -73,10 +73,8 @@ typedef struct small_zone {
 
 } s_small_zone;
 
-void        *malloc_small(size_t size);
-void        *coalesce(void *chunk, s_free_list **bin);
-s_free_list *add_to_bin(s_free_list *chunk, s_free_list **free_list);
-s_free_list *pop_from_bin(s_free_list **free_list);
-void        *resize_chunk(s_free_list *chunk, size_t size, s_free_list **bin);
+void *malloc_small(size_t size);
+void  free_small(void *ptr, s_zone_hdr *zone_hdr);
+void *realloc_small(void *ptr, size_t size, s_zone_hdr *zone_hdr);
 
-#endif /* MALLOC_SMALL_H */
+#endif /* SMALL_H */

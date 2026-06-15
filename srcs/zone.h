@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 22:25:53 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/23 11:35:48 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 15:53:49 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,7 +38,8 @@ static inline uint64_t compute_checksum(s_zone_hdr *zone)
 	return zone->magic ^ zone->type ^ zone->self ^ zone->size;
 }
 
-void *new_zone(e_zone_type zone_type, size_t size);
-void  release_zone(s_zone_hdr *zone_hdr);
+void       *new_zone(e_zone_type zone_type, size_t size);
+void        release_zone(s_zone_hdr *zone_hdr);
+s_zone_hdr *find_zone(void *ptr);
 
 #endif /* ZONE_H */

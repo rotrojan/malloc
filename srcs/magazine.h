@@ -6,15 +6,15 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/16 12:56:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/13 16:40:08 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 15:33:41 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef MAGAZINE_H
 #define MAGAZINE_H
 
-#include "malloc_small.h"
-#include "malloc_tiny.h"
+#include "small.h"
+#include "tiny.h"
 
 #include <pthread.h>
 

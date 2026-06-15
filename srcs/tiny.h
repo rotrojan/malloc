@@ -1,17 +1,17 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   malloc_tiny.h                                      :+:      :+:    :+:   */
+/*   tiny.h                                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/13 15:58:06 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 16:07:58 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef MALLOC_TINY_H
-#define MALLOC_TINY_H
+#ifndef TINY_H
+#define TINY_H
 
 #include "helpers.h"
 #include "malloc_state.h"
@@ -46,7 +46,8 @@ typedef struct tiny_zone {
 	size_t   index_next_free_chunk;
 } s_tiny_zone;
 
-void  *malloc_tiny(size_t size);
-size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone);
+void *malloc_tiny(size_t size);
+void  free_tiny(void *ptr, s_zone_hdr *zone_hdr);
+void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr);
 
-#endif /* MALLOC_TINY_H */
+#endif /* TINY_H */

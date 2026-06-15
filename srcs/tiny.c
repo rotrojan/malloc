@@ -1,21 +1,22 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   malloc_tiny.c                                      :+:      :+:    :+:   */
+/*   tiny.c                                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/13 15:59:06 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 15:35:04 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "malloc_tiny.h"
+#include "tiny.h"
 
 #include "bitmap.h"
 #include "helpers.h"
 #include "libft.h"
 #include "magazine.h"
+#include "malloc.h"
 #include "zone.h"
 
 #include <stddef.h>
@@ -88,7 +89,7 @@ new_zone:
 	return zone;
 }
 
-size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone)
+static size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone)
 {
 	size_t size  = 1;
 	size_t index = (ptr - (char *)zone) / TINY_SIZE_MIN;
@@ -123,4 +124,86 @@ void *malloc_tiny(size_t size)
 	zone->index_next_free_chunk = MIN(zone->index_next_free_chunk, index);
 
 	return (char *)zone + index * TINY_SIZE_MIN;
+}
+
+void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
+{
+	uintptr_t    ptr_int  = (uintptr_t)ptr;
+	s_tiny_zone *zone     = (s_tiny_zone *)zone_hdr;
+	uintptr_t    zone_int = (uintptr_t)zone_hdr;
+	size_t       index;
+	size_t       size;
+
+	if (ptr_int & (TINY_SIZE_MIN - 1))
+		return ft_dprintf(STDERR_FILENO,
+				  "Fatal: invalid pointer passed to free!\n"
+				  "%p: pointer is not aligned.\n",
+				  ptr);
+
+	index = (ptr_int - zone_int) / TINY_SIZE_MIN;
+
+	if (!bitmap_get_bit(zone->in_use, index) ||
+	    !bitmap_get_bit(zone->is_start, index))
+		return ft_dprintf(STDERR_FILENO,
+				  "Fatal: invalid pointer passed to free!\n"
+				  "%p: pointer was never malloced.\n",
+				  ptr);
+
+	size = get_nb_chunks_tiny_alloc(ptr, zone);
+
+	bitmap_clear_range(zone->in_use, index, size);
+	bitmap_clear_bit(zone->is_start, index);
+
+	zone->index_next_free_chunk = MIN(zone->index_next_free_chunk, index);
+
+	/* Check if zone is empty. If so, release it. */
+	for (size_t i = 0; i < ARRAY_SIZE(zone->in_use); i++) {
+		if (zone->in_use[i])
+			return;
+	}
+	release_zone(zone_hdr);
+}
+
+void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)
+{
+	void        *new_ptr;
+	s_tiny_zone *zone = (s_tiny_zone *)zone_hdr;
+	size_t       old_needed_chunks =
+		get_nb_chunks_tiny_alloc(ptr, (s_tiny_zone *)zone);
+	size_t new_needed_chunks;
+	size_t index;
+
+	if (size > TINY_SIZE_MAX)
+		goto new_alloc;
+
+	index             = ((char *)ptr - (char *)zone) / TINY_SIZE_MIN;
+	new_needed_chunks = MAX(1, DIV_CEIL(size, TINY_SIZE_MIN));
+
+	if (new_needed_chunks < old_needed_chunks) {
+		for (size_t i = index + new_needed_chunks;
+		     i < index + old_needed_chunks; i++)
+			bitmap_clear_bit(zone->in_use, i);
+		zone->index_next_free_chunk = MIN(zone->index_next_free_chunk,
+						  index + new_needed_chunks);
+		return ptr;
+	}
+
+	for (size_t i = index + old_needed_chunks;
+	     i < index + new_needed_chunks; i++)
+		if (bitmap_get_bit(zone->in_use, i))
+			goto new_alloc;
+
+	for (size_t i = index + old_needed_chunks;
+	     i < index + new_needed_chunks; i++)
+		bitmap_set_bit(zone->in_use, i);
+
+	return ptr;
+
+new_alloc:
+	new_ptr = malloc(size);
+	if (new_ptr == NULL)
+		return NULL;
+	ft_memcpy(new_ptr, ptr, old_needed_chunks * TINY_SIZE_MIN);
+	free(ptr);
+	return new_ptr;
 }

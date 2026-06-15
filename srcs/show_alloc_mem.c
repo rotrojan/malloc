@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/22 14:18:10 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/10 22:06:02 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 15:59:55 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,9 +15,9 @@
 #include "bitmap.h"
 #include "helpers.h"
 #include "libft.h"
-#include "malloc_small.h"
 #include "malloc_state.h"
-#include "malloc_tiny.h"
+#include "small.h"
+#include "tiny.h"
 
 #include <stddef.h>
 
