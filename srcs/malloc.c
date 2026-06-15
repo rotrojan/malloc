@@ -6,11 +6,9 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 18:14:47 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 18:25:01 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
-
-/* TODO: get rid of asserts ! */
 
 #include "malloc.h"
 

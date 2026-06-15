@@ -6,13 +6,12 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/28 16:15:20 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/30 14:10:59 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 18:25:35 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "bitmap.h"
 
-#include <assert.h> /* for CHAR_BIT */
 #include <stddef.h> /* for size_t*/
 #include <stdint.h> /* for uint64_t */
 
@@ -46,8 +45,6 @@ void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range)
 	size_t   offset;
 	uint64_t mask = (1ULL << range) - 1;
 
-	assert(range > 0 && range <= 8);
-
 	word_index = index / BITS_PER_WORD;
 	offset     = index % BITS_PER_WORD;
 
@@ -61,8 +58,6 @@ void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range)
 	size_t   word_index;
 	size_t   offset;
 	uint64_t mask = (1ULL << range) - 1;
-
-	assert(range > 0 && range <= 8);
 
 	word_index = index / BITS_PER_WORD;
 	offset     = index % BITS_PER_WORD;
@@ -101,8 +96,6 @@ size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
 	size_t         offset;
 	uint8_t        window;
 	size_t         i = hint;
-
-	assert(requested > 0 && requested <= 8);
 
 	if (hint >= total_bits)
 		return SIZE_MAX;

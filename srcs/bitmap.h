@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/28 16:24:22 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/15 18:25:53 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -57,7 +57,6 @@ void bitmap_set_bit(uint64_t *bitmap, size_t index);
  * @param range  The number of bits to set (Must be 1-8).
  *
  * @note This operation is performed using a bitwise OR with a generated mask.
- * @warning Asserts if @p range is 0 or exceeds 8 bits.
  * @see bitmap_clear_range
  * @see bitmap_clear_bit
  */
@@ -75,7 +74,6 @@ void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range);
  * @param range  The number of bits to clear (Must be 1-8).
  *
  * @note This operation is performed using a bitwise AND with an inverted mask.
- * @warning Asserts if @p range is 0 or exceeds 8 bits.
  * @see bitmap_set_range
  * @see bitmap_set_bit
  */
@@ -100,7 +98,6 @@ void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range);
  *
  * @note This function is optimized to skip full words and uses a skip-ahead
  * mechanism via bitmap_skip_eight() to accelerate the search.
- * @warning The function asserts that @p requested is between 1 and 8 bits.
  */
 size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
 				     size_t requested, size_t hint);
