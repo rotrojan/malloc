@@ -6,12 +6,13 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 18:25:01 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/17 22:51:44 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "malloc.h"
 
+#include "arena.h"
 #include "large.h"
 #include "libft.h"
 #include "malloc_state.h"
@@ -39,6 +40,8 @@ static void init_malloc_state(void)
 	g_malloc_state.current_memory = 0;
 
 	g_malloc_state.page_size = sysconf(_SC_PAGESIZE);
+
+	pthread_mutex_init(&g_malloc_state.list_mutex, NULL);
 }
 
 void *malloc(size_t size)
@@ -60,6 +63,7 @@ void *malloc(size_t size)
 void free(void *ptr)
 {
 	s_zone_hdr *zone;
+	s_arena    *arena;
 
 	if (ptr == NULL)
 		return;
@@ -71,14 +75,16 @@ void free(void *ptr)
 				  "%p: pointer does not belong to any zone.\n",
 				  ptr);
 
-	switch (zone->type) {
-	case TINY_ZONE:
-		return free_tiny(ptr, zone);
-	case SMALL_ZONE:
-		return free_small(ptr, zone);
-	default:
+	if (zone->type == LARGE_ZONE)
 		return release_zone(zone);
-	}
+
+	arena = zone->arena;
+	pthread_mutex_lock(&arena->mutex);
+	if (zone->type == TINY_ZONE)
+		free_tiny(ptr, zone);
+	else /* if (zone->type == SMALL_ZONE) */
+		free_small(ptr, zone);
+	pthread_mutex_unlock(&arena->mutex);
 }
 
 void *realloc(void *ptr, size_t size)

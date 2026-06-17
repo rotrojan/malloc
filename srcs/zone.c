@@ -6,15 +6,17 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 15:26:13 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 15:30:07 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/17 23:02:25 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "zone.h"
+
+#include "arena.h"
 #include "libft.h"
-#include "magazine.h"
 #include "malloc_state.h"
 
+#include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -43,22 +45,22 @@ static void pop_zone(s_zone_hdr *zone)
 	}
 }
 
-static s_zone_hdr *add_zone_to_magazine(s_zone_hdr *zone)
+static s_zone_hdr *add_zone_to_arena(s_zone_hdr *zone, s_arena *arena)
 {
-	s_magazine   *mag = get_magazine();
 	s_tiny_zone  *tiny_zone;
 	s_small_zone *small_zone;
 
+	zone->arena = arena;
 	if (zone->type == TINY_ZONE) {
-		tiny_zone       = (s_tiny_zone *)zone;
-		tiny_zone->next = mag->tiny_list;
-		mag->tiny_list  = tiny_zone;
-		mag->tiny_hot   = tiny_zone;
+		tiny_zone        = (s_tiny_zone *)zone;
+		tiny_zone->next  = arena->tiny_list;
+		arena->tiny_list = tiny_zone;
+		arena->tiny_hot  = tiny_zone;
 	} else if (zone->type == SMALL_ZONE) {
-		small_zone       = (s_small_zone *)zone;
-		small_zone->next = mag->small_list;
-		mag->small_list  = small_zone;
-		mag->small_hot   = small_zone;
+		small_zone        = (s_small_zone *)zone;
+		small_zone->next  = arena->small_list;
+		arena->small_list = small_zone;
+		arena->small_hot  = small_zone;
 	}
 
 	return zone;
@@ -66,8 +68,8 @@ static s_zone_hdr *add_zone_to_magazine(s_zone_hdr *zone)
 
 static void remove_tiny(s_tiny_zone *zone)
 {
-	s_magazine   *mag     = get_magazine();
-	s_tiny_zone **current = &mag->tiny_list;
+	s_arena      *arena   = zone->zone_hdr.arena;
+	s_tiny_zone **current = &arena->tiny_list;
 
 	while (*current != NULL) {
 		if (*current == zone) {
@@ -77,13 +79,13 @@ static void remove_tiny(s_tiny_zone *zone)
 		current = &((*current)->next);
 	}
 
-	mag->tiny_hot = mag->tiny_list;
+	arena->tiny_hot = arena->tiny_list;
 }
 
 static void remove_small(s_small_zone *zone)
 {
-	s_magazine    *mag     = get_magazine();
-	s_small_zone **current = &mag->small_list;
+	s_arena       *arena   = zone->zone_hdr.arena;
+	s_small_zone **current = &arena->small_list;
 
 	while (*current != NULL) {
 		if (*current == zone) {
@@ -93,10 +95,10 @@ static void remove_small(s_small_zone *zone)
 		current = &((*current)->next);
 	}
 
-	mag->small_hot = mag->small_list;
+	arena->small_hot = arena->small_list;
 }
 
-static void remove_zone_from_magazine(s_zone_hdr *zone)
+static void remove_zone_from_arena(s_zone_hdr *zone)
 {
 	if (zone->type == TINY_ZONE)
 		remove_tiny((s_tiny_zone *)zone);
@@ -104,7 +106,7 @@ static void remove_zone_from_magazine(s_zone_hdr *zone)
 		remove_small((s_small_zone *)zone);
 }
 
-void *new_zone(e_zone_type zone_type, size_t size)
+void *new_zone(e_zone_type zone_type, size_t size, s_arena *arena)
 {
 	s_zone_hdr *new_zone =
 		(s_zone_hdr *)mmap(NULL, size, PROT_READ | PROT_WRITE,
@@ -119,22 +121,27 @@ void *new_zone(e_zone_type zone_type, size_t size)
 	new_zone->size     = size;
 	new_zone->self     = (uintptr_t)new_zone;
 	new_zone->checksum = compute_checksum(new_zone);
+	new_zone->arena    = arena;
 	new_zone->next     = NULL;
 
+	pthread_mutex_lock(&g_malloc_state.list_mutex);
 	push_zone_ordered(new_zone);
+	pthread_mutex_unlock(&g_malloc_state.list_mutex);
 
 	if (zone_type != LARGE_ZONE)
-		add_zone_to_magazine(new_zone);
+		add_zone_to_arena(new_zone, arena);
 
 	return new_zone;
 }
 
 void release_zone(s_zone_hdr *zone_hdr)
 {
+	pthread_mutex_lock(&g_malloc_state.list_mutex);
 	pop_zone(zone_hdr);
+	pthread_mutex_unlock(&g_malloc_state.list_mutex);
 
 	if (zone_hdr->type != LARGE_ZONE)
-		remove_zone_from_magazine(zone_hdr);
+		remove_zone_from_arena(zone_hdr);
 
 	if (munmap(zone_hdr, zone_hdr->size))
 		ft_dprintf(STDERR_FILENO, "Fatal: cannot relase zone!\n");
@@ -199,13 +206,18 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
  */
 s_zone_hdr *find_zone(void *ptr)
 {
+	pthread_mutex_lock(&g_malloc_state.list_mutex);
 	for (s_zone_hdr *current = g_malloc_state.zone_list; current != NULL;
 	     current             = current->next) {
-		if ((uintptr_t)current > (uintptr_t)ptr)
+		if ((uintptr_t)current > (uintptr_t)ptr) {
 			break;
-		if (zone_is_valid(ptr, current, current->type))
+		}
+		if (zone_is_valid(ptr, current, current->type)) {
+			pthread_mutex_unlock(&g_malloc_state.list_mutex);
 			return current;
+		}
 	}
+	pthread_mutex_unlock(&g_malloc_state.list_mutex);
 
 	return NULL;
 }

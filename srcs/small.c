@@ -6,28 +6,29 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/13 12:29:46 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 15:41:41 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/17 21:49:45 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "small.h"
 
+#include "arena.h"
 #include "libft.h"
-#include "magazine.h"
 #include "malloc.h"
 #include "zone.h"
 
+#include <pthread.h>
 #include <stddef.h>
 #include <unistd.h>
 
-static s_small_zone *new_small_zone(void)
+static s_small_zone *new_small_zone(s_arena *arena)
 {
 	s_small_zone *zone;
 	char         *prologue;
 	char         *epilogue;
 	char         *wild_chunk;
 
-	zone = new_zone(SMALL_ZONE, SMALL_ZONE_SIZE);
+	zone = new_zone(SMALL_ZONE, SMALL_ZONE_SIZE, arena);
 	if (zone == NULL)
 		return NULL;
 
@@ -67,15 +68,16 @@ static int zone_has_chunk(size_t size, s_small_zone *zone)
 	return 0;
 }
 
-static s_small_zone *get_small_zone(size_t size)
+/**
+ * Finds (or creates) a small zone in `arena` with a chunk big enough for
+ * `size`. The caller (malloc_small) already holds the arena mutex, so this
+ * does no locking of its own.
+ */
+static s_small_zone *get_small_zone(size_t size, s_arena *arena)
 {
-	s_magazine   *mag;
 	s_small_zone *zone;
 
-	mag = get_magazine();
-	if (mag == NULL)
-		return NULL;
-	zone = mag->small_hot;
+	zone = arena->small_hot;
 	if (zone == NULL)
 		goto new_zone;
 
@@ -86,14 +88,18 @@ static s_small_zone *get_small_zone(size_t size)
 	/**
 	 * If hot zone does not have enough space, try other zones in the list.
 	 */
-	for (s_small_zone *current = mag->small_list; current != NULL;
+	for (s_small_zone *current = arena->small_list; current != NULL;
 	     current               = current->next) {
-		if (zone_has_chunk(size, current))
+		if (current == zone)
+			continue;
+		if (zone_has_chunk(size, current)) {
+			arena->small_hot = current;
 			return current;
+		}
 	}
 
 new_zone:
-	zone = new_small_zone();
+	zone = new_small_zone(arena);
 	if (zone == NULL)
 		return NULL;
 
@@ -217,7 +223,9 @@ void *malloc_small(size_t size)
 	size_t        real_size;
 	e_bin_idx     bin_idx;
 	s_small_zone *zone;
+	s_arena      *arena = get_arena();
 	s_free_list **bin;
+	void         *ptr;
 
 	/**
 	 * Take account of boundary tags and round up to the upper SMALL_QUANTUM
@@ -226,9 +234,11 @@ void *malloc_small(size_t size)
 	real_size = (size + 2 * TAG_SIZE + SMALL_QUANTUM - 1) &
 		    ~(SMALL_QUANTUM - 1);
 
-	zone = get_small_zone(real_size);
-	if (zone == NULL)
+	zone = get_small_zone(real_size, arena);
+	if (zone == NULL) {
+		pthread_mutex_unlock(&arena->mutex);
 		return NULL;
+	}
 
 	bin     = zone->bin;
 	bin_idx = BIN_IDX(real_size);
@@ -239,7 +249,9 @@ void *malloc_small(size_t size)
 	if (bin[bin_idx] != NULL) {
 		PUT_TAG(CHUNK_HDR(bin[bin_idx]), TAG(real_size, IN_USE));
 		PUT_TAG(CHUNK_FTR(bin[bin_idx]), TAG(real_size, IN_USE));
-		return pop_from_bin(&bin[bin_idx]);
+		ptr = pop_from_bin(&bin[bin_idx]);
+		pthread_mutex_unlock(&arena->mutex);
+		return ptr;
 	}
 
 	/**
@@ -249,12 +261,16 @@ void *malloc_small(size_t size)
 	 */
 	bin_idx++;
 	while (bin_idx < NB_BINS) {
-		if (bin[bin_idx])
-			return resize_chunk(pop_from_bin(&bin[bin_idx]),
-					    real_size, bin);
+		if (bin[bin_idx]) {
+			ptr = resize_chunk(pop_from_bin(&bin[bin_idx]),
+					   real_size, bin);
+			pthread_mutex_unlock(&arena->mutex);
+			return ptr;
+		}
 		bin_idx++;
 	}
 
+	pthread_mutex_unlock(&arena->mutex);
 	return NULL;
 }
 
@@ -270,8 +286,9 @@ void free_small(void *ptr, s_zone_hdr *zone_hdr)
 
 	freed = coalesce(ptr, zone->bin);
 	size  = GET_SIZE(CHUNK_HDR(freed));
-	if (size == SMALL_ZONE_SIZE - SMALL_QUANTUM)
+	if (size == SMALL_ZONE_SIZE - SMALL_QUANTUM) {
 		return release_zone(zone_hdr);
+	}
 
 	add_to_bin(freed, &zone->bin[BIN_IDX(size)]);
 }
@@ -279,27 +296,34 @@ void free_small(void *ptr, s_zone_hdr *zone_hdr)
 void *realloc_small(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 {
 	void         *new_ptr;
-	size_t        old_size  = GET_SIZE(CHUNK_HDR(ptr));
+	size_t        old_real_size;
 	size_t        real_size = (size + 2 * TAG_SIZE + SMALL_QUANTUM - 1) &
 				  ~(SMALL_QUANTUM - 1);
 	s_small_zone *zone      = (s_small_zone *)zone_hdr;
+	s_arena      *arena     = zone_hdr->arena;
 
+	pthread_mutex_lock(&arena->mutex);
+	old_real_size = GET_SIZE(CHUNK_HDR(ptr));
 	if (size <= TINY_SIZE_MAX || size > SMALL_SIZE_MAX)
 		goto new_alloc;
 
-	if (old_size == real_size)
+	if (old_real_size == real_size) {
+		pthread_mutex_unlock(&arena->mutex);
 		return ptr;
+	}
 
-	if (resize_chunk(ptr, real_size, zone->bin) != NULL)
+	if (resize_chunk(ptr, real_size, zone->bin) != NULL) {
+		pthread_mutex_unlock(&arena->mutex);
 		/* Because `resize_chunk()` returns ptr on success.*/
 		return ptr;
+	}
 
 new_alloc:
+	pthread_mutex_unlock(&arena->mutex);
 	new_ptr = malloc(size);
 	if (new_ptr == NULL)
 		return NULL;
-	ft_memcpy(new_ptr, ptr,
-		  MIN(size, GET_SIZE(CHUNK_HDR(ptr)) - 2 * TAG_SIZE));
+	ft_memcpy(new_ptr, ptr, MIN(size, old_real_size - 2 * TAG_SIZE));
 	free(ptr);
 	return new_ptr;
 }

@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/07 14:22:49 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/05/11 16:53:27 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/17 23:18:45 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,13 +35,17 @@ void *__wrap_mmap(void *addr, size_t len, int prot, int flags, int fildes,
 {
 	void *ptr;
 
-	if (g_malloc_state.current_memory + len > g_malloc_state.max_memory)
+	pthread_mutex_lock(&g_malloc_state.stat_mutex);
+	if (g_malloc_state.current_memory + len > g_malloc_state.max_memory) {
+		pthread_mutex_unlock(&g_malloc_state.stat_mutex);
 		return MAP_FAILED;
+	}
 
 	ptr = __real_mmap(addr, len, prot, flags, fildes, off);
 
 	if (ptr != MAP_FAILED)
 		g_malloc_state.current_memory += len;
+	pthread_mutex_unlock(&g_malloc_state.stat_mutex);
 
 	return ptr;
 }
@@ -50,10 +54,12 @@ int __wrap_munmap(void *addr, size_t len)
 {
 	int ret;
 
+	pthread_mutex_lock(&g_malloc_state.stat_mutex);
 	ret = __real_munmap(addr, len);
 
 	if (ret == 0)
 		g_malloc_state.current_memory -= len;
+	pthread_mutex_unlock(&g_malloc_state.stat_mutex);
 
 	return ret;
 }

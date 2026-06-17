@@ -6,19 +6,20 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 15:35:04 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/17 21:09:18 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "tiny.h"
 
+#include "arena.h"
 #include "bitmap.h"
 #include "helpers.h"
 #include "libft.h"
-#include "magazine.h"
 #include "malloc.h"
 #include "zone.h"
 
+#include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/mman.h>
@@ -26,9 +27,9 @@
 
 #define NO_USABLE_INDEX SIZE_MAX
 
-static s_tiny_zone *new_tiny_zone(void)
+static s_tiny_zone *new_tiny_zone(s_arena *arena)
 {
-	s_tiny_zone *zone = new_zone(TINY_ZONE, TINY_ZONE_SIZE);
+	s_tiny_zone *zone = new_zone(TINY_ZONE, TINY_ZONE_SIZE, arena);
 
 	if (zone == NULL)
 		return NULL;
@@ -48,15 +49,17 @@ static size_t get_usable_index(size_t needed_chunks, s_tiny_zone *zone)
 					     zone->index_next_free_chunk);
 }
 
-static s_tiny_zone *get_tiny_zone(size_t needed_chunks, size_t *index)
+/**
+ * Finds (or creates) a tiny zone in `arena` with room for `needed_chunks`.
+ * The caller (malloc_tiny) already holds the arena mutex, so this does no
+ * locking of its own.
+ */
+static s_tiny_zone *get_tiny_zone(size_t needed_chunks, size_t *index,
+				  s_arena *arena)
 {
-	s_magazine  *mag;
 	s_tiny_zone *zone;
 
-	mag = get_magazine();
-	if (mag == NULL)
-		return NULL;
-	zone = mag->tiny_hot;
+	zone = arena->tiny_hot;
 	if (zone == NULL)
 		goto new_zone;
 
@@ -68,13 +71,13 @@ static s_tiny_zone *get_tiny_zone(size_t needed_chunks, size_t *index)
 	/**
 	 * If hot zone does not have enough space, try other zones in the list.
 	 */
-	for (s_tiny_zone *current = mag->tiny_list; current != NULL;
+	for (s_tiny_zone *current = arena->tiny_list; current != NULL;
 	     current              = current->next) {
 		if (current == zone)
 			continue;
 		*index = get_usable_index(needed_chunks, current);
 		if (*index != NO_USABLE_INDEX) {
-			mag->tiny_hot = current;
+			arena->tiny_hot = current;
 			return current;
 		}
 	}
@@ -82,7 +85,7 @@ static s_tiny_zone *get_tiny_zone(size_t needed_chunks, size_t *index)
 new_zone:
 	/* If no zone has enough space, or if it is the first call to
 	 * malloc_tiny, `mmap()` a new zone. */
-	zone = new_tiny_zone();
+	zone = new_tiny_zone(arena);
 	if (zone == NULL)
 		return NULL;
 	*index = zone->index_next_free_chunk;
@@ -108,20 +111,26 @@ void *malloc_tiny(size_t size)
 	size_t       needed_chunks;
 	size_t       index;
 	s_tiny_zone *zone;
+	s_arena     *arena = get_arena();
 
 	/**
 	 * If `size == 0`, we still allocate one chunk.
-	 * From `man 3 malloc`: "If size is 0, then malloc() returns a unique
-	 * pointer value that can later be successfully passed to free()".
+	 * From `man 3 malloc`: "If size is 0, then malloc() returns a
+	 * unique pointer value that can later be successfully passed to
+	 * free()".
 	 */
 	needed_chunks = MAX(1, DIV_CEIL(size, TINY_SIZE_MIN));
-	zone          = get_tiny_zone(needed_chunks, &index);
-	if (zone == NULL)
+	zone          = get_tiny_zone(needed_chunks, &index, arena);
+	if (zone == NULL) {
+		pthread_mutex_unlock(&arena->mutex);
 		return NULL;
+	}
 
 	bitmap_set_range(zone->in_use, index, needed_chunks);
 	bitmap_set_bit(zone->is_start, index);
 	zone->index_next_free_chunk = MIN(zone->index_next_free_chunk, index);
+
+	pthread_mutex_unlock(&arena->mutex);
 
 	return (char *)zone + index * TINY_SIZE_MIN;
 }
@@ -134,20 +143,22 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 	size_t       index;
 	size_t       size;
 
-	if (ptr_int & (TINY_SIZE_MIN - 1))
+	if (ptr_int & (TINY_SIZE_MIN - 1)) {
 		return ft_dprintf(STDERR_FILENO,
 				  "Fatal: invalid pointer passed to free!\n"
 				  "%p: pointer is not aligned.\n",
 				  ptr);
+	}
 
 	index = (ptr_int - zone_int) / TINY_SIZE_MIN;
 
 	if (!bitmap_get_bit(zone->in_use, index) ||
-	    !bitmap_get_bit(zone->is_start, index))
+	    !bitmap_get_bit(zone->is_start, index)) {
 		return ft_dprintf(STDERR_FILENO,
 				  "Fatal: invalid pointer passed to free!\n"
 				  "%p: pointer was never malloced.\n",
 				  ptr);
+	}
 
 	size = get_nb_chunks_tiny_alloc(ptr, zone);
 
@@ -158,20 +169,25 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 
 	/* Check if zone is empty. If so, release it. */
 	for (size_t i = 0; i < ARRAY_SIZE(zone->in_use); i++) {
-		if (zone->in_use[i])
+		if (zone->in_use[i]) {
 			return;
+		}
 	}
+
 	release_zone(zone_hdr);
 }
 
 void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 {
 	void        *new_ptr;
-	s_tiny_zone *zone = (s_tiny_zone *)zone_hdr;
-	size_t       old_needed_chunks =
-		get_nb_chunks_tiny_alloc(ptr, (s_tiny_zone *)zone);
-	size_t new_needed_chunks;
-	size_t index;
+	s_tiny_zone *zone  = (s_tiny_zone *)zone_hdr;
+	s_arena     *arena = zone_hdr->arena;
+	size_t       old_needed_chunks;
+	size_t       new_needed_chunks;
+	size_t       index;
+
+	pthread_mutex_lock(&arena->mutex);
+	old_needed_chunks = get_nb_chunks_tiny_alloc(ptr, (s_tiny_zone *)zone);
 
 	if (size > TINY_SIZE_MAX)
 		goto new_alloc;
@@ -185,6 +201,7 @@ void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 			bitmap_clear_bit(zone->in_use, i);
 		zone->index_next_free_chunk = MIN(zone->index_next_free_chunk,
 						  index + new_needed_chunks);
+		pthread_mutex_unlock(&arena->mutex);
 		return ptr;
 	}
 
@@ -197,9 +214,12 @@ void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	     i < index + new_needed_chunks; i++)
 		bitmap_set_bit(zone->in_use, i);
 
+	pthread_mutex_unlock(&arena->mutex);
+
 	return ptr;
 
 new_alloc:
+	pthread_mutex_unlock(&arena->mutex);
 	new_ptr = malloc(size);
 	if (new_ptr == NULL)
 		return NULL;

@@ -7,7 +7,7 @@ ARFLAGS = rcs
 RM = rm -fr
 
 # Files
-SRCS = malloc.c tiny.c small.c large.c zone.c magazine.c show_alloc_mem.c bitmap.c stat_mmap.c
+SRCS = malloc.c tiny.c small.c large.c zone.c arena.c show_alloc_mem.c bitmap.c stat_mmap.c
 OBJS = $(SRCS:%.c=$(CACHE_DIR)/%.o)
 DEPS = $(SRCS:%.c=$(CACHE_DIR)/%.d)
 

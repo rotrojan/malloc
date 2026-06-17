@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/30 15:45:23 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 15:59:05 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/17 22:52:20 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 #include "small.h"
 #include "zone.h"
 
+#include <pthread.h>
 #include <stddef.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -26,7 +27,7 @@ void *malloc_large(size_t size)
 {
 	size_t real_size = (size + sizeof(s_zone_hdr) + PAGE_SIZE - 1) &
 			   ~(PAGE_SIZE - 1);
-	void  *zone      = new_zone(LARGE_ZONE, real_size);
+	void  *zone      = new_zone(LARGE_ZONE, real_size, NULL);
 
 	if (zone == NULL)
 		return NULL;
@@ -45,18 +46,23 @@ void *realloc_large(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	new_real_size = (size + sizeof(s_zone_hdr) + PAGE_SIZE - 1) &
 			~(PAGE_SIZE - 1);
 
-	if (new_real_size == zone_hdr->size)
+	if (new_real_size == zone_hdr->size) {
 		return ptr;
+	}
 
 	if (new_real_size < zone_hdr->size) {
+		pthread_mutex_lock(&g_malloc_state.list_mutex);
 		if (munmap((char *)zone_hdr + new_real_size,
 			   zone_hdr->size - new_real_size) == -1) {
+			pthread_mutex_unlock(&g_malloc_state.list_mutex);
 			ft_dprintf(STDERR_FILENO,
 				   "Fatal: cannot shrink zone!\n");
 			return NULL;
 		}
-		zone_hdr->size = new_real_size;
+		zone_hdr->size     = new_real_size;
+		zone_hdr->checksum = compute_checksum(zone_hdr);
 
+		pthread_mutex_unlock(&g_malloc_state.list_mutex);
 		return ptr;
 	}
 

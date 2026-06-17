@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/22 14:18:10 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 15:59:55 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/17 23:13:55 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,7 @@
 #include "small.h"
 #include "tiny.h"
 
+#include <pthread.h>
 #include <stddef.h>
 
 static void print_large_zone(s_zone_hdr *zone, ptrdiff_t *total_alloc)
@@ -93,11 +94,15 @@ static void print_tiny_zone(s_tiny_zone *zone, ptrdiff_t *total_alloc)
 
 void show_alloc_mem(void)
 {
-	s_zone_hdr *current     = g_malloc_state.zone_list;
+	s_zone_hdr *current;
 	ptrdiff_t   total_alloc = 0;
 
-	if (current == NULL)
+	pthread_mutex_lock(&g_malloc_state.list_mutex);
+	current = g_malloc_state.zone_list;
+	if (current == NULL) {
+		pthread_mutex_unlock(&g_malloc_state.list_mutex);
 		return;
+	}
 
 	while (current != NULL) {
 		switch (current->type) {
@@ -113,6 +118,7 @@ void show_alloc_mem(void)
 		}
 		current = current->next;
 	}
+	pthread_mutex_unlock(&g_malloc_state.list_mutex);
 
 	ft_printf("Total : %d bytes\n", total_alloc);
 }
