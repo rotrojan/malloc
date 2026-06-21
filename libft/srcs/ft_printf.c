@@ -6,11 +6,12 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/23 16:17:46 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/04/25 11:27:56 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/22 16:23:57 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <unistd.h>
 
@@ -47,18 +48,39 @@ static void buffer_putstr(s_buffer *buffer, const char *s)
 
 static void buffer_putdecimal(s_buffer *buffer, int n)
 {
-	char tmp[12];
-	int  i = 11;
+	char         tmp[12];
+	int          i = 11;
+	unsigned int u;
+
+	tmp[i] = '\0';
+
+	if (n < 0) {
+		buffer_putchar(buffer, '-');
+		u = -(unsigned int)n; /* -(unsigned)INT_MIN is well-defined */
+	} else
+		u = (unsigned int)n;
+
+	if (u == 0)
+		return buffer_putchar(buffer, '0');
+
+	while (u > 0) {
+		tmp[--i] = '0' + (u % 10);
+		u /= 10;
+	}
+
+	while (tmp[i])
+		buffer_putchar(buffer, tmp[i++]);
+}
+
+static void buffer_putudecimal(s_buffer *buffer, size_t n)
+{
+	char tmp[21]; /* 2^64 - 1 == 20 digits, + NUL */
+	int  i = 20;
 
 	tmp[i] = '\0';
 
 	if (n == 0)
 		return buffer_putchar(buffer, '0');
-
-	if (n < 0) {
-		buffer_putchar(buffer, '-');
-		n = -n;
-	}
 
 	while (n > 0) {
 		tmp[--i] = '0' + (n % 10);
@@ -117,13 +139,17 @@ static void buffer_putptr(s_buffer *buffer, void *ptr)
 		buffer_putchar(buffer, tmp[i++]);
 }
 
+typedef enum {
+	LEN_NONE,
+	LEN_Z, /* 'z' modifier: argument is size_t-wide */
+} e_length;
+
 static void ft_vdprintf(int fd, char const *fmt, va_list ap)
 {
-	s_buffer buffer = {
-		.buf = { 0 },
-		.len = 0,
-		.fd  = fd,
-	};
+	s_buffer buffer;
+
+	buffer.fd  = fd;
+	buffer.len = 0;
 
 	while (*fmt) {
 		if (*fmt != '%') {
@@ -131,13 +157,27 @@ static void ft_vdprintf(int fd, char const *fmt, va_list ap)
 			continue;
 		}
 
-		fmt++; // skip '%'
+		fmt++; /* skip '%' */
+
+		e_length length = LEN_NONE;
+		if (*fmt == 'z') {
+			length = LEN_Z;
+			fmt++;
+		}
+
 		switch (*fmt) {
 		case 's':
 			buffer_putstr(&buffer, va_arg(ap, const char *));
 			break;
 		case 'd':
 			buffer_putdecimal(&buffer, va_arg(ap, int));
+			break;
+		case 'u':
+			if (length == LEN_Z)
+				buffer_putudecimal(&buffer, va_arg(ap, size_t));
+			else
+				buffer_putudecimal(&buffer,
+						   va_arg(ap, unsigned int));
 			break;
 		case 'x':
 			buffer_puthex(&buffer, va_arg(ap, unsigned int), 0);
