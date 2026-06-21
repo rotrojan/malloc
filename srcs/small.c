@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/13 12:29:46 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/17 21:49:45 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/21 17:12:19 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -276,11 +276,26 @@ void *malloc_small(size_t size)
 
 void free_small(void *ptr, s_zone_hdr *zone_hdr)
 {
-	size_t        size  = GET_SIZE(CHUNK_HDR(ptr));
+	size_t        size;
 	s_small_zone *zone  = (s_small_zone *)zone_hdr;
 	s_free_list  *freed = NULL;
 
-	/* TODO: add checks alike to free_tiny (check state, check modulo 256 */
+	if ((uintptr_t)ptr & (SMALL_QUANTUM - 1)) {
+		return ft_dprintf(STDERR_FILENO,
+				  "Fatal: invalid pointer passed to free!\n"
+				  "%p: pointer is not aligned.\n",
+				  ptr);
+	}
+
+	if (GET_STATE(CHUNK_HDR(ptr)) == FREE ||
+	    GET_TAG(CHUNK_HDR(ptr)) != GET_TAG(CHUNK_FTR(ptr))) {
+		return ft_dprintf(STDERR_FILENO,
+				  "Fatal: invalid pointer passed to free!\n"
+				  "%p: pointer was never malloced.\n",
+				  ptr);
+	}
+
+	size = GET_SIZE(CHUNK_HDR(ptr));
 	PUT_TAG(CHUNK_HDR(ptr), TAG(size, FREE));
 	PUT_TAG(CHUNK_FTR(ptr), TAG(size, FREE));
 
