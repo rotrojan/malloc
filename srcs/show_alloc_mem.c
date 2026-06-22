@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/22 14:18:10 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/17 23:13:55 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/22 21:02:13 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -78,12 +78,12 @@ static void print_tiny_zone(s_tiny_zone *zone, size_t *total_alloc)
 
 		j = 1;
 		while (i + j < BIT_ARRAY_SIZE(zone->in_use) &&
-		       j <= TINY_SIZE_MAX / TINY_SIZE_MIN &&
+		       j <= TINY_SIZE_MAX / TINY_QUANTUM &&
 		       !bitmap_get_bit(zone->is_start, i + j) &&
 		       bitmap_get_bit(zone->in_use, i + j))
 			j++;
-		start_alloc = zone_addr + i * TINY_SIZE_MIN;
-		end_alloc   = zone_addr + (i + j) * TINY_SIZE_MIN - 1;
+		start_alloc = zone_addr + i * TINY_QUANTUM;
+		end_alloc   = zone_addr + (i + j) * TINY_QUANTUM - 1;
 		size_alloc  = end_alloc - start_alloc + 1;
 		ft_printf("%p - %p : %zu bytes\n", (void *)start_alloc,
 			  (void *)end_alloc, size_alloc);

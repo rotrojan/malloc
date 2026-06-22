@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:52:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/15 16:07:58 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/22 21:02:12 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,8 +21,8 @@
 #include <stdint.h>
 
 #define TINY_SIZE_MAX 128
-#define TINY_SIZE_MIN 16
-#define NB_CHUNKS_TINY_HDR DIV_CEIL(sizeof(s_tiny_zone), TINY_SIZE_MIN)
+#define TINY_QUANTUM 16
+#define NB_CHUNKS_TINY_HDR DIV_CEIL(sizeof(s_tiny_zone), TINY_QUANTUM)
 
 /**
  * Most frequently, sysconf(_SC_PAGESIZE) = 4096.
@@ -36,7 +36,7 @@ typedef struct tiny_zone {
 	struct tiny_zone *prev;
 	struct tiny_zone *next;
 	/**
-	 * The granularity of the TINY chunks is 16 bytes (TINY_SIZE_MIN). We
+	 * The granularity of the TINY chunks is 16 bytes (TINY_QUANTUM). We
 	 * can store 1024 of them in a TINY zone. These can be represented by a
 	 * 16 uint64_t bitmap.
 	 * 1 -> chunk is in use.

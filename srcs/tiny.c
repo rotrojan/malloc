@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/16 19:57:52 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/17 21:09:18 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/22 21:02:12 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -95,9 +95,9 @@ new_zone:
 static size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone)
 {
 	size_t size  = 1;
-	size_t index = (ptr - (char *)zone) / TINY_SIZE_MIN;
+	size_t index     = (ptr - (char *)zone) / TINY_QUANTUM;
 
-	while (size < TINY_SIZE_MAX / TINY_SIZE_MIN &&
+	while (size < TINY_SIZE_MAX / TINY_QUANTUM &&
 	       index + size < BIT_ARRAY_SIZE(zone->in_use) &&
 	       bitmap_get_bit(zone->in_use, index + size) &&
 	       !bitmap_get_bit(zone->is_start, index + size))
@@ -119,7 +119,7 @@ void *malloc_tiny(size_t size)
 	 * unique pointer value that can later be successfully passed to
 	 * free()".
 	 */
-	needed_chunks = MAX(1, DIV_CEIL(size, TINY_SIZE_MIN));
+	needed_chunks = MAX(1, DIV_CEIL(size, TINY_QUANTUM));
 	zone          = get_tiny_zone(needed_chunks, &index, arena);
 	if (zone == NULL) {
 		pthread_mutex_unlock(&arena->mutex);
@@ -132,7 +132,7 @@ void *malloc_tiny(size_t size)
 
 	pthread_mutex_unlock(&arena->mutex);
 
-	return (char *)zone + index * TINY_SIZE_MIN;
+	return (char *)zone + index * TINY_QUANTUM;
 }
 
 void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
@@ -143,14 +143,14 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 	size_t       index;
 	size_t       size;
 
-	if (ptr_int & (TINY_SIZE_MIN - 1)) {
+	if (ptr_int & (TINY_QUANTUM - 1)) {
 		return ft_dprintf(STDERR_FILENO,
 				  "Fatal: invalid pointer passed to free!\n"
 				  "%p: pointer is not aligned.\n",
 				  ptr);
 	}
 
-	index = (ptr_int - zone_int) / TINY_SIZE_MIN;
+	index = (ptr_int - zone_int) / TINY_QUANTUM;
 
 	if (!bitmap_get_bit(zone->in_use, index) ||
 	    !bitmap_get_bit(zone->is_start, index)) {
@@ -192,8 +192,8 @@ void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	if (size > TINY_SIZE_MAX)
 		goto new_alloc;
 
-	index             = ((char *)ptr - (char *)zone) / TINY_SIZE_MIN;
-	new_needed_chunks = MAX(1, DIV_CEIL(size, TINY_SIZE_MIN));
+	index             = ((char *)ptr - (char *)zone) / TINY_QUANTUM;
+	new_needed_chunks = MAX(1, DIV_CEIL(size, TINY_QUANTUM));
 
 	if (new_needed_chunks < old_needed_chunks) {
 		for (size_t i = index + new_needed_chunks;
@@ -223,7 +223,7 @@ new_alloc:
 	new_ptr = malloc(size);
 	if (new_ptr == NULL)
 		return NULL;
-	ft_memcpy(new_ptr, ptr, old_needed_chunks * TINY_SIZE_MIN);
+	ft_memcpy(new_ptr, ptr, old_needed_chunks * TINY_QUANTUM);
 	free(ptr);
 	return new_ptr;
 }

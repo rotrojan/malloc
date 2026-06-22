@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 15:26:13 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/17 23:02:25 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/22 21:02:12 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -170,7 +170,7 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
 	if (zone_type == TINY_ZONE) {
 		if (zone->size != TINY_ZONE_SIZE)
 			return 0;
-		if (ptr_int < zone_int + NB_CHUNKS_TINY_HDR * TINY_SIZE_MIN ||
+		if (ptr_int < zone_int + NB_CHUNKS_TINY_HDR * TINY_QUANTUM ||
 		    ptr_int >= zone_int + zone->size)
 			return 0;
 	} else if (zone_type == SMALL_ZONE) {

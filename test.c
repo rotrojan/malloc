@@ -102,7 +102,7 @@ static int check_pattern(const void *ptr, size_t n, unsigned seed)
 /* Section 1 — Basic allocation — TINY range                                  */
 /*                                                                            */
 /* Tests that malloc returns non-NULL and 16-byte-aligned pointers for every  */
-/* size in the TINY range (1–128 B). Alignment of 16 is TINY_SIZE_MIN: the    */
+/* size in the TINY range (1–128 B). Alignment of 16 is TINY_QUANTUM: the     */
 /* bitmap granularity. A pointer misaligned by even 1 byte would indicate     */
 /* the chunk-index arithmetic in malloc_tiny is wrong.                        */
 /* -------------------------------------------------------------------------- */
@@ -236,7 +236,7 @@ static void test_write_integrity(void)
 /* Section 5 — free of maximum-span TINY allocations (113–128 B → 8 chunks)   */
 /*                                                                            */
 /* With 16 B granularity, a 128 B request occupies 128/16 = 8 chunks — the    */
-/* most a single TINY allocation can ever span (TINY_SIZE_MAX/TINY_SIZE_MIN). */
+/* most a single TINY allocation can ever span (TINY_SIZE_MAX/TINY_QUANTUM).  */
 /* Sizes 113–128 all round up to this 8-chunk maximum. On free, free_tiny     */
 /* counts the consecutive in-use chunks that belong to the allocation; this   */
 /* test drives that count at its upper boundary, where an off-by-one (scanning */
@@ -377,7 +377,7 @@ static void test_tiny_zone_exhaustion(void)
 /* creates a fresh zone.                                                       */
 /*                                                                            */
 /* 1024 chunks/zone - 20 header chunks = 1004 usable. This is white-box: it    */
-/* depends on TINY_ZONE_SIZE=4*PAGE_SIZE, TINY_SIZE_MIN=16, and               */
+/* depends on TINY_ZONE_SIZE=4*PAGE_SIZE, TINY_QUANTUM=16, and                */
 /* NB_CHUNKS_TINY_HDR=20.                                                      */
 /* -------------------------------------------------------------------------- */
 
