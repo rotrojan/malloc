@@ -153,7 +153,7 @@ void release_zone(s_zone_hdr *zone_hdr)
 		ft_dprintf(STDERR_FILENO, "Fatal: cannot relase zone!\n");
 }
 
-static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
+static int zone_is_valid(void *ptr, s_zone_hdr *zone)
 {
 	uintptr_t ptr_int  = (uintptr_t)ptr;
 	uintptr_t zone_int = (uintptr_t)zone;
@@ -164,22 +164,19 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone, e_zone_type zone_type)
 	if (zone->self != zone_int)
 		return 0;
 
-	if (zone->type != zone_type)
-		return 0;
-
-	if (zone_type == TINY_ZONE) {
+	if (zone->type == TINY_ZONE) {
 		if (zone->size != TINY_ZONE_SIZE)
 			return 0;
 		if (ptr_int < zone_int + NB_CHUNKS_TINY_HDR * TINY_QUANTUM ||
 		    ptr_int >= zone_int + zone->size)
 			return 0;
-	} else if (zone_type == SMALL_ZONE) {
+	} else if (zone->type == SMALL_ZONE) {
 		if (zone->size != SMALL_ZONE_SIZE)
 			return 0;
 		if (ptr_int < zone_int + SMALL_QUANTUM ||
 		    ptr_int >= zone_int + zone->size)
 			return 0;
-	} else /*if (zone_type == LARGE_ZONE)*/ {
+	} else /*if (zone->type == LARGE_ZONE)*/ {
 		if (ptr_int != zone_int + sizeof(s_zone_hdr))
 			return 0;
 	}
@@ -218,7 +215,7 @@ s_zone_hdr *find_zone(void *ptr)
 		if ((uintptr_t)current > (uintptr_t)ptr) {
 			break;
 		}
-		if (zone_is_valid(ptr, current, current->type)) {
+		if (zone_is_valid(ptr, current)) {
 			pthread_mutex_unlock(&g_malloc_state.list_mutex);
 			return current;
 		}
