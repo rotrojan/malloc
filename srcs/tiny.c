@@ -94,16 +94,16 @@ new_zone:
 
 static size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone)
 {
-	size_t size  = 1;
+	size_t nb_chunks = 1;
 	size_t index     = (ptr - (char *)zone) / TINY_QUANTUM;
 
-	while (size < TINY_SIZE_MAX / TINY_QUANTUM &&
-	       index + size < BIT_ARRAY_SIZE(zone->in_use) &&
-	       bitmap_get_bit(zone->in_use, index + size) &&
-	       !bitmap_get_bit(zone->is_start, index + size))
-		size++;
+	while (nb_chunks < TINY_SIZE_MAX / TINY_QUANTUM &&
+	       index + nb_chunks < BIT_ARRAY_SIZE(zone->in_use) &&
+	       bitmap_get_bit(zone->in_use, index + nb_chunks) &&
+	       !bitmap_get_bit(zone->is_start, index + nb_chunks))
+		nb_chunks++;
 
-	return size;
+	return nb_chunks;
 }
 
 void *malloc_tiny(size_t size)
@@ -141,7 +141,7 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 	s_tiny_zone *zone     = (s_tiny_zone *)zone_hdr;
 	uintptr_t    zone_int = (uintptr_t)zone_hdr;
 	size_t       index;
-	size_t       size;
+	size_t       nb_chunks;
 
 	if (ptr_int & (TINY_QUANTUM - 1)) {
 		return ft_dprintf(STDERR_FILENO,
@@ -160,9 +160,9 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 				  ptr);
 	}
 
-	size = get_nb_chunks_tiny_alloc(ptr, zone);
+	nb_chunks = get_nb_chunks_tiny_alloc(ptr, zone);
 
-	bitmap_clear_range(zone->in_use, index, size);
+	bitmap_clear_range(zone->in_use, index, nb_chunks);
 	bitmap_clear_bit(zone->is_start, index);
 
 	zone->index_next_free_chunk = MIN(zone->index_next_free_chunk, index);
