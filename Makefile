@@ -66,7 +66,7 @@ clean:
 	$(MAKE) -C $(LIBFT) $@
 
 fclean:
-	$(RM) $(CACHE_DIR) $(NAME) $(SYMLINK) $(TEST_BIN)
+	$(RM) $(CACHE_DIR) $(NAME) $(SYMLINK) $(TEST_BIN) $(TEST_MT_BIN)
 	$(MAKE) -C $(LIBFT) $@
 
 re: fclean all
@@ -77,4 +77,14 @@ $(TEST_BIN): test.c $(LIBFT)/$(LIBFT).a
 run_test: $(NAME) $(TEST_BIN)
 	LD_PRELOAD=./$(SYMLINK) ./test
 
-.PHONY: all symlink clean fclean re run_test 
+$(TEST_MT_BIN): test_mt.c
+	$(CC) -Wall -Wextra -Werror -g3 -D_GNU_SOURCE -pthread $< -o $@
+
+# Multithreaded stress test under helgrind. --soname-synonyms=somalloc=NONE
+# stops valgrind from replacing malloc with its own, so OUR allocator runs and
+# helgrind can analyse its locking.
+run_test_mt: $(NAME) $(TEST_MT_BIN)
+	LD_PRELOAD=./$(SYMLINK) valgrind --tool=helgrind \
+		--soname-synonyms=somalloc=NONE --error-exitcode=1 ./$(TEST_MT_BIN)
+
+.PHONY: all symlink clean fclean re run_test run_test_mt
