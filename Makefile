@@ -1,7 +1,7 @@
 # Implicit variables
 CC = cc
 CFLAGS = -Wall -Wextra -Werror -fPIC $(INCLUDE_DIRS:%=-I%) -MMD -MP
-LDFLAGS = -shared -L$(LIBFT) -$(patsubst lib%,l%,$(LIBFT)) -Wl,--wrap=mmap -Wl,--wrap=munmap -lpthread
+LDFLAGS = -shared -L$(LIBFT) -$(patsubst lib%,l%,$(LIBFT)) -Wl,--wrap=mmap -Wl,--wrap=munmap -Wl,--version-script=$(VERSION_MAP) -lpthread
 AR = ar
 ARFLAGS = rcs
 RM = rm -fr
@@ -10,6 +10,7 @@ RM = rm -fr
 SRCS = malloc.c tiny.c small.c large.c zone.c arena.c show_alloc_mem.c bitmap.c stat_mmap.c
 OBJS = $(SRCS:%.c=$(CACHE_DIR)/%.o)
 DEPS = $(SRCS:%.c=$(CACHE_DIR)/%.d)
+VERSION_MAP = libft_malloc.map
 
 # Directories
 SRCS_DIR = srcs
@@ -35,12 +36,13 @@ endif
 NAME = libft_malloc_$(HOSTTYPE).so
 SYMLINK = libft_malloc.so
 TEST_BIN = test
+TEST_MT_BIN = test_mt
 
 vpath %.c $(shell find $(SRCS_DIR) -type d)
 
 all: $(NAME) $(SYMLINK)
 
-$(NAME): $(OBJS) $(LIBFT)/$(LIBFT).a
+$(NAME): $(OBJS) $(LIBFT)/$(LIBFT).a $(VERSION_MAP)
 	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
 symlink: $(SYMLINK)
