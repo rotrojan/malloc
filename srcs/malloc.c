@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/17 22:51:44 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/22 22:31:19 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -120,38 +120,42 @@ void *realloc(void *ptr, size_t size)
 	}
 }
 
+#ifdef EXTRA
 /*
- * calloc and reallocarray are intentionally not implemented.
+ * calloc and reallocarray are not part of the subject. They are compiled in
+ * only under -DEXTRA (make EXTRA=1), purely to run real programs (e.g. vim)
+ * entirely on this allocator.
  *
- * Exporting either symbol via LD_PRELOAD causes any library in the process
- * (e.g. nss-systemd during `ls -la` group-name resolution) that calls
- * `calloc()` to receive a pointer from our heap. When glibc later inspects that
- * pointer through `malloc_usable_size()` — which it calls internally before
- * deciding whether to realloc — it tries to parse it as a glibc chunk header
- * and crashes. The subject only requires `malloc()`, `free()` and `realloc()`,
- * so the simplest correct fix is to leave these symbols unimplemented and let
- * the dynamic linker fall through to glibc.
- *
- * void *calloc(size_t n, size_t size)
- * {
- * 	void  *ptr;
- * 	size_t total;
- *
- * 	if (n != 0 && size > SIZE_MAX / n)
- * 		return NULL;
- *
- * 	total = n * size;
- * 	ptr   = malloc(total);
- * 	if (ptr != NULL)
- * 		ft_memset(ptr, 0, total);
- * 	return ptr;
- * }
- *
- * void *reallocarray(void *ptr, size_t n, size_t size)
- * {
- * 	if (n != 0 && size > SIZE_MAX / n)
- * 		return (NULL);
- *
- * 	return (realloc(ptr, n * size));
- * }
+ * They are opt-in, and off by default, because exporting calloc under
+ * LD_PRELOAD is dangerous: any library in the process (e.g. nss-systemd during
+ * `ls -la` group-name resolution) that calls calloc() receives a pointer from
+ * our heap, and when glibc later inspects it via malloc_usable_size() (called
+ * internally before deciding whether to realloc) it parses our pointer as a
+ * glibc chunk header and crashes. A default build therefore exports only
+ * malloc/free/realloc and lets the dynamic linker fall through to glibc for
+ * calloc; EXTRA builds accept that risk in exchange for fuller interposition.
  */
+
+void *calloc(size_t n, size_t size)
+{
+	void  *ptr;
+	size_t total;
+
+	if (n != 0 && size > SIZE_MAX / n)
+		return NULL;
+
+	total = n * size;
+	ptr   = malloc(total);
+	if (ptr != NULL)
+		ft_memset(ptr, 0, total);
+	return ptr;
+}
+
+void *reallocarray(void *ptr, size_t n, size_t size)
+{
+	if (n != 0 && size > SIZE_MAX / n)
+		return (NULL);
+
+	return (realloc(ptr, n * size));
+}
+#endif

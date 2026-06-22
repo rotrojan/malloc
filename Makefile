@@ -28,6 +28,10 @@ ifdef DEBUG
 CFLAGS += -g3
 endif
 
+ifdef EXTRA
+CFLAGS += -DEXTRA
+endif
+
 ifeq ($(HOSTTYPE),)
 	HOSTTYPE := $(shell uname -m)_$(shell uname -s)
 endif

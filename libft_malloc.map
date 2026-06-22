@@ -4,6 +4,8 @@
 		free;
 		realloc;
 		show_alloc_mem;
+		calloc;
+		reallocarray;
 	local:
 		*;
 };
