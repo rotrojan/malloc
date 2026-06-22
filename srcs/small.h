@@ -68,6 +68,7 @@ typedef size_t t_boundary_tag;
 
 typedef struct small_zone {
 	s_zone_hdr         zone_hdr;
+	struct small_zone *prev;
 	struct small_zone *next;
 	s_free_list       *bin[NB_BINS];
 

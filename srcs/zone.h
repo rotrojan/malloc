@@ -33,6 +33,7 @@ typedef struct __attribute__((aligned(16))) zone_hdr {
 	uintptr_t        self;
 	uint64_t         checksum;
 	struct arena    *arena;
+	struct zone_hdr *prev;
 	struct zone_hdr *next;
 } s_zone_hdr;
 

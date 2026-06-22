@@ -33,6 +33,7 @@
 
 typedef struct tiny_zone {
 	s_zone_hdr        zone_hdr;
+	struct tiny_zone *prev;
 	struct tiny_zone *next;
 	/**
 	 * The granularity of the TINY chunks is 16 bytes (TINY_SIZE_MIN). We

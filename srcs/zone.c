@@ -22,27 +22,32 @@
 
 static void push_zone_ordered(s_zone_hdr *zone)
 {
-	s_zone_hdr **zone_list = &g_malloc_state.zone_list;
-	s_zone_hdr **current   = zone_list;
+	s_zone_hdr *prev    = NULL;
+	s_zone_hdr *current = g_malloc_state.zone_list;
 
-	while (*current != NULL && (uintptr_t)zone > (uintptr_t)(*current))
-		current = &((*current)->next);
-	zone->next = *current;
-	*current   = zone;
+	while (current != NULL && (uintptr_t)zone > (uintptr_t)current) {
+		prev    = current;
+		current = current->next;
+	}
+
+	zone->prev = prev;
+	zone->next = current;
+	if (current != NULL)
+		current->prev = zone;
+	if (prev != NULL)
+		prev->next = zone;
+	else
+		g_malloc_state.zone_list = zone;
 }
 
 static void pop_zone(s_zone_hdr *zone)
 {
-	s_zone_hdr **zone_list = &g_malloc_state.zone_list;
-	s_zone_hdr **current   = zone_list;
-
-	while (*current != NULL) {
-		if (*current == zone) {
-			*current = (*current)->next;
-			return;
-		}
-		current = &((*current)->next);
-	}
+	if (zone->prev != NULL)
+		zone->prev->next = zone->next;
+	else
+		g_malloc_state.zone_list = zone->next;
+	if (zone->next != NULL)
+		zone->next->prev = zone->prev;
 }
 
 static s_zone_hdr *add_zone_to_arena(s_zone_hdr *zone, s_arena *arena)
@@ -52,13 +57,19 @@ static s_zone_hdr *add_zone_to_arena(s_zone_hdr *zone, s_arena *arena)
 
 	zone->arena = arena;
 	if (zone->type == TINY_ZONE) {
-		tiny_zone        = (s_tiny_zone *)zone;
-		tiny_zone->next  = arena->tiny_list;
+		tiny_zone       = (s_tiny_zone *)zone;
+		tiny_zone->prev = NULL;
+		tiny_zone->next = arena->tiny_list;
+		if (arena->tiny_list != NULL)
+			arena->tiny_list->prev = tiny_zone;
 		arena->tiny_list = tiny_zone;
 		arena->tiny_hot  = tiny_zone;
 	} else if (zone->type == SMALL_ZONE) {
-		small_zone        = (s_small_zone *)zone;
-		small_zone->next  = arena->small_list;
+		small_zone       = (s_small_zone *)zone;
+		small_zone->prev = NULL;
+		small_zone->next = arena->small_list;
+		if (arena->small_list != NULL)
+			arena->small_list->prev = small_zone;
 		arena->small_list = small_zone;
 		arena->small_hot  = small_zone;
 	}
@@ -68,32 +79,28 @@ static s_zone_hdr *add_zone_to_arena(s_zone_hdr *zone, s_arena *arena)
 
 static void remove_tiny(s_tiny_zone *zone)
 {
-	s_arena      *arena   = zone->zone_hdr.arena;
-	s_tiny_zone **current = &arena->tiny_list;
+	s_arena *arena = zone->zone_hdr.arena;
 
-	while (*current != NULL) {
-		if (*current == zone) {
-			*current = (*current)->next;
-			break;
-		}
-		current = &((*current)->next);
-	}
+	if (zone->prev != NULL)
+		zone->prev->next = zone->next;
+	else
+		arena->tiny_list = zone->next;
+	if (zone->next != NULL)
+		zone->next->prev = zone->prev;
 
 	arena->tiny_hot = arena->tiny_list;
 }
 
 static void remove_small(s_small_zone *zone)
 {
-	s_arena       *arena   = zone->zone_hdr.arena;
-	s_small_zone **current = &arena->small_list;
+	s_arena *arena = zone->zone_hdr.arena;
 
-	while (*current != NULL) {
-		if (*current == zone) {
-			*current = (*current)->next;
-			break;
-		}
-		current = &((*current)->next);
-	}
+	if (zone->prev != NULL)
+		zone->prev->next = zone->next;
+	else
+		arena->small_list = zone->next;
+	if (zone->next != NULL)
+		zone->next->prev = zone->prev;
 
 	arena->small_hot = arena->small_list;
 }
@@ -122,7 +129,6 @@ void *new_zone(e_zone_type zone_type, size_t size, s_arena *arena)
 	new_zone->self     = (uintptr_t)new_zone;
 	new_zone->checksum = compute_checksum(new_zone);
 	new_zone->arena    = arena;
-	new_zone->next     = NULL;
 
 	pthread_mutex_lock(&g_malloc_state.list_mutex);
 	push_zone_ordered(new_zone);
