@@ -37,6 +37,7 @@ NAME = libft_malloc_$(HOSTTYPE).so
 SYMLINK = libft_malloc.so
 TEST_BIN = test
 TEST_MT_BIN = test_mt
+TEST_OOM_BIN = test_oom
 
 vpath %.c $(shell find $(SRCS_DIR) -type d)
 
@@ -66,7 +67,7 @@ clean:
 	$(MAKE) -C $(LIBFT) $@
 
 fclean:
-	$(RM) $(CACHE_DIR) $(NAME) $(SYMLINK) $(TEST_BIN) $(TEST_MT_BIN)
+	$(RM) $(CACHE_DIR) $(NAME) $(SYMLINK) $(TEST_BIN) $(TEST_MT_BIN) $(TEST_OOM_BIN)
 	$(MAKE) -C $(LIBFT) $@
 
 re: fclean all
@@ -87,4 +88,12 @@ run_test_mt: $(NAME) $(TEST_MT_BIN)
 	LD_PRELOAD=./$(SYMLINK) valgrind --tool=helgrind \
 		--soname-synonyms=somalloc=NONE --error-exitcode=1 ./$(TEST_MT_BIN)
 
-.PHONY: all symlink clean fclean re run_test run_test_mt
+$(TEST_OOM_BIN): test_oom.c
+	$(CC) -Wall -Wextra -Werror -g3 $< -o $@
+
+# Out-of-memory test: lowers RLIMIT_AS and checks malloc fails gracefully
+# (returns NULL, no crash) at the address-space ceiling, then recovers on free.
+run_test_oom: $(NAME) $(TEST_OOM_BIN)
+	LD_PRELOAD=./$(SYMLINK) ./$(TEST_OOM_BIN)
+
+.PHONY: all symlink clean fclean re run_test run_test_mt run_test_oom
