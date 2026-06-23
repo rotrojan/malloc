@@ -22,6 +22,11 @@
 #include <pthread.h>
 #include <stddef.h>
 
+/**
+ * Print the single allocation filling a LARGE zone: the payload runs from just
+ * past the header to the end of the mapping. Accumulate its size into the
+ * running total (subject format: "<start> - <end> : <n> bytes").
+ */
 static void print_large_zone(s_zone_hdr *zone, size_t *total_alloc)
 {
 	uintptr_t zone_addr = (uintptr_t)zone;
@@ -40,6 +45,13 @@ static void print_large_zone(s_zone_hdr *zone, size_t *total_alloc)
 	*total_alloc += size_alloc;
 }
 
+/**
+ * Walk a SMALL zone chunk by chunk using the boundary tags (NEXT_CHUNK follows
+ * each header's size field), printing only the IN_USE chunks. The walk starts
+ * at the first real chunk (past the prologue quantum) and stops at the
+ * epilogue. Reported size is the chunk's total tagged size, matching the
+ * subject's "allocated memory zone" reading.
+ */
 static void print_small_zone(s_small_zone *zone, size_t *total_alloc)
 {
 	uintptr_t zone_addr = (uintptr_t)zone;
@@ -59,6 +71,14 @@ static void print_small_zone(s_small_zone *zone, size_t *total_alloc)
 	}
 }
 
+/**
+ * Walk a TINY zone's bitmaps and print each allocation. Outer loop scans for an
+ * is_start bit (the first chunk of an allocation), skipping past the header
+ * chunks and any free gaps. The inner loop then measures the allocation's span
+ * `j` by counting consecutive in_use chunks up to (but not including) the next
+ * is_start, the 8-chunk class maximum, or the bitmap end -- the same extent
+ * rule free_tiny uses. The printed range covers j whole 16-byte chunks.
+ */
 static void print_tiny_zone(s_tiny_zone *zone, size_t *total_alloc)
 {
 	size_t    i = NB_CHUNKS_TINY_HDR;
@@ -92,6 +112,14 @@ static void print_tiny_zone(s_tiny_zone *zone, size_t *total_alloc)
 	}
 }
 
+/**
+ * The one mandated debug entry point. Walk the global, address-ordered zone
+ * registry under the list mutex and print every live allocation grouped by zone
+ * type, then the grand total, in the subject's format. Taking only the list
+ * mutex (never an arena lock) is consistent with the lock order: this is a
+ * read-only registry walk. Live bitmaps/tags may shift the instant the lock is
+ * dropped, so the snapshot is best-effort, which is all a debug dump needs.
+ */
 void show_alloc_mem(void)
 {
 	s_zone_hdr *current;

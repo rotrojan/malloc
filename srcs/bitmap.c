@@ -39,6 +39,14 @@ void bitmap_clear_bit(uint64_t *bitmap, size_t index)
 	bitmap[word_index] &= ~(1ULL << offset);
 }
 
+/**
+ * Set `range` (1-8) consecutive bits starting at `index`. The low `range` bits
+ * of `mask` are set, then shifted into place. When the run straddles a 64-bit
+ * word boundary, the part that overflowed past bit 63 is the high bits of the
+ * shifted mask; it is folded down (mask >> (BITS_PER_WORD - offset)) into the
+ * next word. Range <= 8 (the TINY class max) guarantees the spill touches at
+ * most one extra word.
+ */
 void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range)
 {
 	size_t   word_index;
@@ -53,6 +61,10 @@ void bitmap_set_range(uint64_t *bitmap, size_t index, size_t range)
 		bitmap[word_index + 1] |= (mask >> (BITS_PER_WORD - offset));
 }
 
+/**
+ * Clear `range` (1-8) bits at `index`; the AND-with-inverted-mask mirror of
+ * bitmap_set_range, including the same word-boundary spill into the next word.
+ */
 void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range)
 {
 	size_t   word_index;
@@ -109,20 +121,29 @@ size_t bitmap_find_consecutive_zeros(uint64_t *bitmap, size_t size,
 		word_index = i / BITS_PER_WORD;
 		offset     = i % BITS_PER_WORD;
 
+		/* A fully-occupied aligned word holds no run: skip it whole. */
 		if (offset == 0 && bitmap[word_index] == UINT64_MAX) {
 			i += BITS_PER_WORD;
 			continue;
 		}
 
+		/**
+		 * Build the `requested`-wide window starting at bit i. Shift
+		 * the current word down so i lands at bit 0; if the run would
+		 * spill past this word's top, splice in the low bits of the
+		 * next word.
+		 */
 		window = bitmap[word_index] >> offset;
 		if (offset + requested > BITS_PER_WORD && word_index < size - 1)
 			window |= bitmap[word_index + 1]
 				  << (BITS_PER_WORD - offset);
 
+		/* Low `requested` bits all clear means a free run starts at i.
+		 */
 		if ((window & mask) == 0)
 			return i;
 
-		/* Little optimization to avoid redundant checks. */
+		/* Otherwise jump past the obstructing occupied chunk. */
 		i += bitmap_skip_eight(window);
 	}
 

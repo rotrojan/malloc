@@ -36,6 +36,12 @@ void *__wrap_mmap(void *addr, size_t len, int prot, int flags, int fildes,
 	void *ptr;
 
 	pthread_mutex_lock(&g_malloc_state.stat_mutex);
+	/**
+	 * Enforce our own ceiling before asking the kernel: if this mapping
+	 * would push us past max_memory, fail it ourselves with MAP_FAILED so
+	 * the allocator propagates a clean NULL. (The kernel's RLIMIT_AS
+	 * usually trips first, but this covers the case where it does not.)
+	 */
 	if (g_malloc_state.current_memory + len > g_malloc_state.max_memory) {
 		pthread_mutex_unlock(&g_malloc_state.stat_mutex);
 		return MAP_FAILED;
@@ -43,6 +49,7 @@ void *__wrap_mmap(void *addr, size_t len, int prot, int flags, int fildes,
 
 	ptr = __real_mmap(addr, len, prot, flags, fildes, off);
 
+	/* Count only what the kernel actually mapped. */
 	if (ptr != MAP_FAILED)
 		g_malloc_state.current_memory += len;
 	pthread_mutex_unlock(&g_malloc_state.stat_mutex);
@@ -57,6 +64,7 @@ int __wrap_munmap(void *addr, size_t len)
 	pthread_mutex_lock(&g_malloc_state.stat_mutex);
 	ret = __real_munmap(addr, len);
 
+	/* Give the bytes back to the counter only on a successful unmap. */
 	if (ret == 0)
 		g_malloc_state.current_memory -= len;
 	pthread_mutex_unlock(&g_malloc_state.stat_mutex);

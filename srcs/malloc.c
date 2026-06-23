@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/22 22:31:19 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/23 02:14:58 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,8 +26,19 @@
 #include <sys/resource.h>
 #include <unistd.h> /* for STDERR_FILENO */
 
+/**
+ * The one global for allocation state; the mutexes are completed in
+ * init_malloc_state, run once via this pthread_once control.
+ */
 s_malloc_state g_malloc_state = { .once_control = PTHREAD_ONCE_INIT };
 
+/**
+ * One-time initialization, fired by pthread_once on the first malloc/realloc.
+ * Records the address-space limit (RLIMIT_AS, treated as unbounded when
+ * infinite) that the mmap wrapper enforces, the page size every zone is sized
+ * against, and the registry mutex. The arena mutexes need no init here: they
+ * live in BSS and zero is a valid PTHREAD_MUTEX_INITIALIZER on glibc.
+ */
 static void init_malloc_state(void)
 {
 	struct rlimit rlim;
@@ -50,6 +61,10 @@ void *malloc(size_t size)
 
 	pthread_once(&g_malloc_state.once_control, &init_malloc_state);
 
+	/**
+	 * Route by size class. The boundaries are the class ceilings; each
+	 * worker acquires its own arena lock (alloc may use any arena).
+	 */
 	if (size <= TINY_SIZE_MAX)
 		ret = malloc_tiny(size);
 	else if (size <= SMALL_SIZE_MAX)
@@ -68,6 +83,11 @@ void free(void *ptr)
 	if (ptr == NULL)
 		return;
 
+	/**
+	 * Locate the owning zone. A NULL result means the pointer belongs to no
+	 * zone of ours (foreign pointer, e.g. a glibc allocation made before
+	 * the LD_PRELOAD hook): report and return without touching anything.
+	 */
 	zone = find_zone(ptr);
 	if (zone == NULL)
 		return ft_dprintf(STDERR_FILENO,
@@ -75,9 +95,20 @@ void free(void *ptr)
 				  "%p: pointer does not belong to any zone.\n",
 				  ptr);
 
+	/**
+	 * LARGE zones have no arena; release_zone takes the global lock itself.
+	 */
 	if (zone->type == LARGE_ZONE)
 		return release_zone(zone);
 
+	/**
+	 * free must go to the zone's *owning* arena (never get_arena): the
+	 * operation targets one specific existing zone. Cache zone->arena
+	 * before dispatch -- the worker may munmap the zone, after which the
+	 * header is gone. The pin invariant (a valid free holds a live pointer)
+	 * guarantees no other thread can empty or release this zone before we
+	 * lock it.
+	 */
 	arena = zone->arena;
 	pthread_mutex_lock(&arena->mutex);
 	if (zone->type == TINY_ZONE)
@@ -93,7 +124,10 @@ void *realloc(void *ptr, size_t size)
 
 	pthread_once(&g_malloc_state.once_control, &init_malloc_state);
 
-	/* Edge cases defined in `man malloc`.*/
+	/**
+	 * Edge cases from `man malloc`: realloc(NULL, n) == malloc(n);
+	 * realloc(p, 0) frees p and returns NULL.
+	 */
 	if (ptr == NULL)
 		return malloc(size);
 	if (size == 0) {
@@ -110,6 +144,10 @@ void *realloc(void *ptr, size_t size)
 		return NULL;
 	}
 
+	/**
+	 * Each worker locks the owning arena itself (the realloc lock contract,
+	 * symmetric to free); dispatch by the zone's class.
+	 */
 	switch (zone->type) {
 	case TINY_ZONE:
 		return realloc_tiny(ptr, size, zone);
@@ -121,7 +159,7 @@ void *realloc(void *ptr, size_t size)
 }
 
 #ifdef EXTRA
-/*
+/**
  * calloc and reallocarray are not part of the subject. They are compiled in
  * only under -DEXTRA (make EXTRA=1), purely to run real programs (e.g. vim)
  * entirely on this allocator.
@@ -141,6 +179,10 @@ void *calloc(size_t n, size_t size)
 	void  *ptr;
 	size_t total;
 
+	/**
+	 * Reject n * size overflow before it wraps (n == 0 short-circuits the
+	 * division). calloc, unlike malloc, must also zero the result.
+	 */
 	if (n != 0 && size > SIZE_MAX / n)
 		return NULL;
 
@@ -153,6 +195,7 @@ void *calloc(size_t n, size_t size)
 
 void *reallocarray(void *ptr, size_t n, size_t size)
 {
+	/* Same overflow guard, then defer to realloc on the product. */
 	if (n != 0 && size > SIZE_MAX / n)
 		return (NULL);
 

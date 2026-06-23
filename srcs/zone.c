@@ -20,6 +20,13 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+/**
+ * Insert `zone` into the global registry keeping it sorted by ascending
+ * address. find_zone and show_alloc_mem rely on this order: find_zone can stop
+ * walking as soon as a zone's base exceeds the searched pointer, and
+ * show_alloc_mem prints allocations in increasing address order as the subject
+ * requires. Caller holds g_malloc_state.list_mutex.
+ */
 static void push_zone_ordered(s_zone_hdr *zone)
 {
 	s_zone_hdr *prev    = NULL;
@@ -40,6 +47,10 @@ static void push_zone_ordered(s_zone_hdr *zone)
 		g_malloc_state.zone_list = zone;
 }
 
+/**
+ * Unlink `zone` from the global registry in O(1) -- the list is doubly-linked
+ * so no predecessor search is needed. Caller holds g_malloc_state.list_mutex.
+ */
 static void pop_zone(s_zone_hdr *zone)
 {
 	if (zone->prev != NULL)
@@ -50,6 +61,13 @@ static void pop_zone(s_zone_hdr *zone)
 		zone->next->prev = zone->prev;
 }
 
+/**
+ * Link a freshly created TINY/SMALL zone at the head of its arena's typed list
+ * and make it the hot zone (allocations probe the hot zone first). The arena
+ * lists are doubly-linked, embedded in s_tiny_zone/s_small_zone, and distinct
+ * from the global registry links in the header. Lock-free: the only caller
+ * (new_zone) is invoked with the arena mutex already held.
+ */
 static s_zone_hdr *add_zone_to_arena(s_zone_hdr *zone, s_arena *arena)
 {
 	s_tiny_zone  *tiny_zone;
@@ -77,6 +95,11 @@ static s_zone_hdr *add_zone_to_arena(s_zone_hdr *zone, s_arena *arena)
 	return zone;
 }
 
+/**
+ * Unlink a TINY zone from its arena list in O(1) and reset the hot pointer to
+ * the new list head (the removed zone is about to be munmap'd, so it must not
+ * remain hot). Lock-free: caller holds the arena mutex.
+ */
 static void remove_tiny(s_tiny_zone *zone)
 {
 	s_arena *arena = zone->zone_hdr.arena;
@@ -91,6 +114,7 @@ static void remove_tiny(s_tiny_zone *zone)
 	arena->tiny_hot = arena->tiny_list;
 }
 
+/* Same as remove_tiny, for SMALL zones. Lock-free: caller holds arena mutex. */
 static void remove_small(s_small_zone *zone)
 {
 	s_arena *arena = zone->zone_hdr.arena;
@@ -105,6 +129,10 @@ static void remove_small(s_small_zone *zone)
 	arena->small_hot = arena->small_list;
 }
 
+/**
+ * Dispatch the arena-list unlink to the type-specific helper. LARGE zones are
+ * never in an arena, so the caller skips this for them. Lock-free.
+ */
 static void remove_zone_from_arena(s_zone_hdr *zone)
 {
 	if (zone->type == TINY_ZONE)
@@ -137,6 +165,12 @@ void *new_zone(e_zone_type zone_type, size_t size, s_arena *arena)
 	new_zone->arena    = arena;
 	new_zone->checksum = compute_checksum(new_zone);
 
+	/**
+	 * Two-step registration. The global list mutex guards only the global
+	 * registry; the arena link is done outside it under the arena mutex the
+	 * caller already holds. The lock order is always arena -> list (never
+	 * the reverse), and add_zone_to_arena takes no lock of its own.
+	 */
 	pthread_mutex_lock(&g_malloc_state.list_mutex);
 	push_zone_ordered(new_zone);
 	pthread_mutex_unlock(&g_malloc_state.list_mutex);
@@ -160,6 +194,16 @@ void release_zone(s_zone_hdr *zone_hdr)
 		ft_dprintf(STDERR_FILENO, "Fatal: cannot relase zone!\n");
 }
 
+/**
+ * Decide whether `ptr` is a valid user pointer into `zone`. Checks run cheapest
+ * first: magic, then the self-pointer (catches a header-shaped pattern that is
+ * not actually at its own address), then per-type size and address-range
+ * bounds, and finally the XOR checksum (which also authenticates the type).
+ *
+ * For LARGE zones the bounds check is an exact equality -- only the single
+ * pointer just past the header is valid -- which stops a foreign glibc pointer
+ * from falsely matching a large mapping by mere range overlap.
+ */
 static int zone_is_valid(void *ptr, s_zone_hdr *zone)
 {
 	uintptr_t ptr_int  = (uintptr_t)ptr;
@@ -172,18 +216,23 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone)
 		return 0;
 
 	if (zone->type == TINY_ZONE) {
+		/* In bounds means past the header chunks and before the end. */
 		if (zone->size != TINY_ZONE_SIZE)
 			return 0;
 		if (ptr_int < zone_int + NB_CHUNKS_TINY_HDR * TINY_QUANTUM ||
 		    ptr_int >= zone_int + zone->size)
 			return 0;
 	} else if (zone->type == SMALL_ZONE) {
+		/**
+		 * No user pointer precedes the first chunk at zone + QUANTUM.
+		 */
 		if (zone->size != SMALL_ZONE_SIZE)
 			return 0;
 		if (ptr_int < zone_int + SMALL_QUANTUM ||
 		    ptr_int >= zone_int + zone->size)
 			return 0;
 	} else /*if (zone->type == LARGE_ZONE)*/ {
+		/* Exactly one valid pointer: the byte just past the header. */
 		if (ptr_int != zone_int + sizeof(s_zone_hdr))
 			return 0;
 	}
@@ -194,7 +243,7 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone)
 	return 1;
 }
 
-/*
+/**
  * NOTE: this function is an admission of failure!
  * The initial idea was to get the address of the page with a oneliner bitwise
  * operation (page_addr = ptr_addr & ~(PAGE_SIZE - 1)), then backward pagewalk
