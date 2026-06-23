@@ -67,6 +67,15 @@ void bitmap_clear_range(uint64_t *bitmap, size_t index, size_t range)
 		bitmap[word_index + 1] &= ~(mask >> (BITS_PER_WORD - offset));
 }
 
+/**
+ * How far the consecutive-zeros search advances after a window fails to match.
+ * `window` has a bit set for each occupied chunk; a failed match means an
+ * occupied chunk falls within the requested run. The search resumes one
+ * position past the lowest occupied chunk -- the earliest start that no longer
+ * overlaps it. skip_map maps the isolated lowest set bit 1<<p to p + 1, so the
+ * advance is in 1..8; the [0] entry (no occupied chunk in the low byte) gives a
+ * full 8-bit step.
+ */
 static inline size_t bitmap_skip_eight(uint64_t window)
 {
 	static const uint8_t skip_map[] = {
@@ -74,16 +83,12 @@ static inline size_t bitmap_skip_eight(uint64_t window)
 		[1ULL << 2] = 3, [1ULL << 3] = 4, [1ULL << 4] = 5,
 		[1ULL << 5] = 6, [1ULL << 6] = 7, [1ULL << 7] = 8,
 	};
-	uint64_t inverted;
 	uint64_t least_significant_bit;
 
-	/* We want to find the index of the least significant 0, not 1. */
-	inverted = ~window;
+	/* Isolate the lowest set bit, i.e. the lowest occupied chunk. */
+	least_significant_bit = window & -window;
 
-	/* Little bitwise trick to isolate lowest set bit. */
-	least_significant_bit = inverted & -inverted;
-
-	/* Masking the 8 last bits avoid out-of-bounds indexes. */
+	/* Mask to the low byte to keep the table index in range. */
 	return skip_map[least_significant_bit & 0xFF];
 }
 
