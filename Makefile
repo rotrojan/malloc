@@ -2,8 +2,6 @@
 CC = cc
 CFLAGS = -Wall -Wextra -Werror -fPIC $(INCLUDE_DIRS:%=-I%) -MMD -MP
 LDFLAGS = -shared -L$(LIBFT) -$(patsubst lib%,l%,$(LIBFT)) -Wl,--wrap=mmap -Wl,--wrap=munmap -Wl,--version-script=$(VERSION_MAP) -lpthread
-AR = ar
-ARFLAGS = rcs
 RM = rm -fr
 
 # Files
@@ -19,7 +17,6 @@ CACHE_DIR = .cache
 
 # Programs
 MKDIR = mkdir -p
-FORMAT = clang-format -i
 LINK_PRG = ln -sf
 
 LIBFT = libft
@@ -58,6 +55,7 @@ $(SYMLINK): $(NAME)
 $(CACHE_DIR):
 	$(MKDIR) $@
 
+-include $(DEPS)
 $(CACHE_DIR)/%.o: %.c | $(CACHE_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 

@@ -64,7 +64,7 @@ $(NAME): $(OBJS)
 
 -include $(DEPS)
 $(CACHE_DIR)/%.o: %.c | $(CACHE_DIR)
-	$(CC) $(CFLAGS) -c $< -o $(@:.c=.o)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 
 $(CACHE_DIR):
