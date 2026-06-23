@@ -251,6 +251,15 @@ void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	}
 
 	/**
+	 * The grown run must stay inside the zone. Without this guard a block
+	 * near the zone end would scan (and set) bits past the bitmap --
+	 * reading the is_start words and claiming chunks beyond the mapping --
+	 * so relocate instead. Mirrors the bound in get_nb_chunks_tiny_alloc.
+	 */
+	if (index + new_needed_chunks > BIT_ARRAY_SIZE(zone->in_use))
+		goto new_alloc;
+
+	/**
 	 * Grow in place only if every extra chunk is currently free; if any is
 	 * taken, we cannot extend here and must relocate.
 	 */

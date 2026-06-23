@@ -35,7 +35,7 @@ This is the 42 *malloc* project.
 ```sh
 make                       # builds libft_malloc_$(uname -m)_$(uname -s).so + the libft_malloc.so symlink
 make DEBUG=1               # same, with -g3 debug symbols
-make run_test              # build + run the single-threaded test suite (114 checks)
+make run_test              # build + run the single-threaded test suite (119 checks)
 make run_test_mt           # build + run the multithreaded stress test under helgrind
 make run_test_oom          # build + run the out-of-memory / allocation-failure test
 ```
@@ -441,7 +441,7 @@ static-link time and never needed dynamic export.
 
 Three independent suites:
 
-- **`test.c` (`make run_test`)** — 20 sections, 114 checks, single-threaded.
+- **`test.c` (`make run_test`)** — 21 sections, 119 checks, single-threaded.
   Covers basic allocation and alignment per class; write-integrity across
   classes; zone exhaustion and release; the full `realloc` matrix (NULL/zero,
   in-place shrink/grow, cross-class migration, LARGE resize, invalid pointer);

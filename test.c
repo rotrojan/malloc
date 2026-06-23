@@ -946,6 +946,76 @@ static void test_show_alloc_mem(void)
 }
 
 /* -------------------------------------------------------------------------- */
+/* Section 21 — realloc grow of a TINY block at the end of its zone           */
+/*                                                                            */
+/* Regression test for a heap overflow in realloc_tiny. A block at the        */
+/* last usable chunk of a TINY zone used to "grow" in place: the scan         */
+/* ran past the end of the in_use bitmap (no bound check), read the           */
+/* adjacent is_start words as free, claimed chunks beyond the mapping,        */
+/* and returned the SAME pointer -- so writing the grown size ran off         */
+/* the end of the 16 KB zone (silent corruption, or a SIGSEGV).               */
+/*                                                                            */
+/* The end-of-zone block is found without hard-coding the header size:        */
+/* on a clean arena, 16-B allocations fill a zone at contiguous (+16 B)       */
+/* addresses, so the block just before the first address jump sits at         */
+/* the zone's last chunk. Growing it to the 128-B (8-chunk) class has         */
+/* no room and MUST relocate; returning the old pointer is the bug.           */
+/* (White-box: assumes a 4 KB page, like the zone-exhaustion tests.)          */
+/* -------------------------------------------------------------------------- */
+
+static void test_realloc_tiny_zone_end(void)
+{
+	SECTION("realloc — grow a TINY block at the end of its zone (regression)");
+
+	enum { CAP = 2048 };
+	void *ptrs[CAP];
+	int   n       = 0;
+	int   end_idx = -1;
+	void *prev    = malloc(16);
+
+	if (prev != NULL)
+		ptrs[n++] = prev;
+	while (prev != NULL && n < CAP) {
+		void *cur = malloc(16);
+		if (cur == NULL)
+			break;
+		ptrs[n++] = cur;
+		if ((char *)cur != (char *)prev + 16) {
+			end_idx = n - 2; /* prev is the last chunk of its zone */
+			break;
+		}
+		prev = cur;
+	}
+
+	CHECK("located a TINY block at a zone boundary", end_idx >= 0);
+
+	if (end_idx >= 0) {
+		void *end_block = ptrs[end_idx];
+		void *grown;
+
+		fill_pattern(end_block, 16, 0xE5);
+		grown = realloc(end_block, 128); /* grow within the TINY class */
+		CHECK("realloc of an end-of-zone TINY block returns non-NULL",
+		      grown != NULL);
+		/* No room past the zone's last chunk, so a correct realloc must
+		 * move the block; returning the same pointer is the overflow. */
+		CHECK("end-of-zone TINY grow relocates instead of overrunning the zone",
+		      grown != NULL && grown != end_block);
+
+		if (grown != NULL && grown != end_block) {
+			ptrs[end_idx] = grown; /* keep the array valid for cleanup */
+			CHECK("end-of-zone grow preserves the original bytes",
+			      check_pattern(grown, 16, 0xE5));
+			CHECK("end-of-zone grown region is fully writable",
+			      fill_and_check(grown, 128, 0xAB));
+		}
+	}
+
+	for (int i = 0; i < n; i++)
+		free(ptrs[i]);
+}
+
+/* -------------------------------------------------------------------------- */
 /* main                                                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -971,6 +1041,7 @@ int main(void)
 	test_small_coalescing();
 	test_stress_cycles();
 	test_show_alloc_mem();
+	test_realloc_tiny_zone_end();
 
 	ft_printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
 
