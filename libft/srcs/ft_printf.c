@@ -165,6 +165,13 @@ static void ft_vdprintf(int fd, char const *fmt, va_list ap)
 			fmt++;
 		}
 
+		/* A trailing '%' (or '%z') has no conversion specifier: emit a
+		 * literal '%' and stop before reading past the terminator. */
+		if (*fmt == '\0') {
+			buffer_putchar(&buffer, '%');
+			break;
+		}
+
 		switch (*fmt) {
 		case 's':
 			buffer_putstr(&buffer, va_arg(ap, const char *));
