@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/21 15:26:13 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/22 21:02:12 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/23 03:15:16 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -113,6 +113,12 @@ static void remove_zone_from_arena(s_zone_hdr *zone)
 		remove_small((s_small_zone *)zone);
 }
 
+uint64_t compute_checksum(s_zone_hdr *zone)
+{
+	return zone->magic ^ zone->type ^ zone->self ^ zone->size ^
+	       (uintptr_t)zone->arena;
+}
+
 void *new_zone(e_zone_type zone_type, size_t size, s_arena *arena)
 {
 	s_zone_hdr *new_zone =
@@ -123,12 +129,13 @@ void *new_zone(e_zone_type zone_type, size_t size, s_arena *arena)
 		return NULL;
 	}
 
+	/* arena must be set before compute_checksum, which folds it in. */
 	new_zone->magic    = MAGIC;
 	new_zone->type     = zone_type;
 	new_zone->size     = size;
 	new_zone->self     = (uintptr_t)new_zone;
-	new_zone->checksum = compute_checksum(new_zone);
 	new_zone->arena    = arena;
+	new_zone->checksum = compute_checksum(new_zone);
 
 	pthread_mutex_lock(&g_malloc_state.list_mutex);
 	push_zone_ordered(new_zone);
