@@ -1016,6 +1016,53 @@ static void test_realloc_tiny_zone_end(void)
 }
 
 /* -------------------------------------------------------------------------- */
+/* Section 22 — malloc/realloc reject page-rounding overflow                  */
+/*                                                                            */
+/* Regression test for the LARGE size-overflow guard. A request within        */
+/* a page+header of SIZE_MAX made (size + header + PAGE_SIZE - 1) wrap        */
+/* to a tiny value, so malloc_large mapped a few KB yet reported              */
+/* success -- the caller then believed it owned ~SIZE_MAX bytes, and          */
+/* realloc_large even munmap'd the tail of a real block on the wrap.          */
+/*                                                                            */
+/* malloc/realloc must return NULL for such sizes, and a failed               */
+/* realloc must leave the original block untouched. We only inspect           */
+/* the returned pointers, never writing through a bogus one; the size         */
+/* is read via a volatile so -Walloc-size-larger-than stays quiet             */
+/* under -Werror.                                                             */
+/* -------------------------------------------------------------------------- */
+
+static void test_large_size_overflow(void)
+{
+	SECTION("malloc/realloc — reject page-rounding overflow (regression)");
+
+	/* volatile so the compiler cannot constant-fold the size into the call
+	 * and trip -Walloc-size-larger-than under -Werror; we are deliberately
+	 * handing the allocator an unsatisfiable size. */
+	volatile size_t huge = SIZE_MAX;
+
+	void *big = malloc(huge);
+	CHECK("malloc(SIZE_MAX) returns NULL, not a tiny mapping", big == NULL);
+	free(big); /* NULL on correct behaviour -- a no-op then */
+
+	void *p = malloc(5000); /* a genuine LARGE block to resize */
+	CHECK("LARGE alloc for the overflow-realloc test", p != NULL);
+	if (p != NULL) {
+		fill_pattern(p, 5000, 0x5A);
+
+		void *r = realloc(p, huge);
+		CHECK("realloc to an overflowing size returns NULL", r == NULL);
+		if (r == NULL) {
+			/* A failed realloc must leave the original untouched. */
+			CHECK("failed overflow-realloc preserves the original",
+			      check_pattern(p, 5000, 0x5A));
+			free(p);
+		} else {
+			free(r); /* buggy path: don't leak / read past the zone */
+		}
+	}
+}
+
+/* -------------------------------------------------------------------------- */
 /* main                                                                       */
 /* -------------------------------------------------------------------------- */
 
@@ -1042,6 +1089,7 @@ int main(void)
 	test_stress_cycles();
 	test_show_alloc_mem();
 	test_realloc_tiny_zone_end();
+	test_large_size_overflow();
 
 	ft_printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
 

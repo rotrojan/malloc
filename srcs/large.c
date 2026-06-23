@@ -20,20 +20,35 @@
 
 #include <pthread.h>
 #include <stddef.h>
+#include <stdint.h> /* for SIZE_MAX */
 #include <sys/mman.h>
 #include <unistd.h>
 
+/**
+ * Total mapping size for a LARGE payload of `size` bytes: header + payload
+ * rounded up to a whole number of pages (the subject requires page-multiple
+ * zones). Returns 0 when the request is so large the page rounding would
+ * overflow size_t; callers treat 0 as failure. Without this guard an
+ * overflowing size wraps to a tiny mapping the caller mistakes for a huge one.
+ */
+static size_t large_zone_size(size_t size)
+{
+	if (size > SIZE_MAX - sizeof(s_zone_hdr) - PAGE_SIZE)
+		return 0;
+	return (size + sizeof(s_zone_hdr) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+}
+
 void *malloc_large(size_t size)
 {
-	/**
-	 * Header + payload, rounded up to a whole number of pages (the subject
-	 * requires page-multiple zones). new_zone takes a NULL arena: LARGE
-	 * zones live only in the global registry.
-	 */
-	size_t real_size = (size + sizeof(s_zone_hdr) + PAGE_SIZE - 1) &
-			   ~(PAGE_SIZE - 1);
-	void  *zone      = new_zone(LARGE_ZONE, real_size, NULL);
+	size_t real_size = large_zone_size(size);
+	void  *zone;
 
+	/* 0 means the request is unsatisfiable (the rounding would overflow). */
+	if (real_size == 0)
+		return NULL;
+
+	/* NULL arena: LARGE zones live only in the global registry. */
+	zone = new_zone(LARGE_ZONE, real_size, NULL);
 	if (zone == NULL)
 		return NULL;
 
@@ -49,8 +64,9 @@ void *realloc_large(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	if (size <= SMALL_SIZE_MAX)
 		goto new_alloc;
 
-	new_real_size = (size + sizeof(s_zone_hdr) + PAGE_SIZE - 1) &
-			~(PAGE_SIZE - 1);
+	new_real_size = large_zone_size(size);
+	if (new_real_size == 0)
+		return NULL;
 
 	/* Same page count: the mapping already fits, nothing to do. */
 	if (new_real_size == zone_hdr->size) {
