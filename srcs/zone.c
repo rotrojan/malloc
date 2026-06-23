@@ -191,7 +191,7 @@ void release_zone(s_zone_hdr *zone_hdr)
 		remove_zone_from_arena(zone_hdr);
 
 	if (munmap(zone_hdr, zone_hdr->size))
-		ft_dprintf(STDERR_FILENO, "Fatal: cannot relase zone!\n");
+		ft_dprintf(STDERR_FILENO, "Fatal: cannot release zone!\n");
 }
 
 /**
