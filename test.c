@@ -114,7 +114,7 @@ static void test_basic_alloc(void)
 	static const size_t sizes[] = {
 		0, 1, 2, 7, 8, 15, 16, 17, 64, 112, 128
 	};
-	const int n = 11;
+	const int n = (int)(sizeof(sizes) / sizeof(sizes[0]));
 	void     *p;
 
 	/*
@@ -148,7 +148,7 @@ static void test_basic_small_alloc(void)
 	SECTION("Basic allocation — SMALL range (129–2032 B)");
 
 	static const size_t sizes[] = { 129, 200, 256, 512, 1024, 2032 };
-	const int           n       = 6;
+	const int           n       = (int)(sizeof(sizes) / sizeof(sizes[0]));
 
 	for (int i = 0; i < n; i++) {
 		void *p = malloc(sizes[i]);
@@ -174,7 +174,7 @@ static void test_large_alloc(void)
 	SECTION("Large allocations (> 2032 B, one mmap each)");
 
 	static const size_t sizes[] = { 2033, 4096, 10000, 1000000 };
-	const int           n       = 4;
+	const int           n       = (int)(sizeof(sizes) / sizeof(sizes[0]));
 
 	for (int i = 0; i < n; i++) {
 		void *p = malloc(sizes[i]);
@@ -204,8 +204,8 @@ static void test_write_integrity(void)
 	static const size_t sizes[] = { 1,   2,   7,    8,    15,   16,   17,
 					31,  32,  63,   64,   65,   97,   112,
 					128, 200, 500,  1000, 2000, 4096, 100000 };
-	const int           n       = 21;
-	void               *ptrs[21];
+	const int           n       = (int)(sizeof(sizes) / sizeof(sizes[0]));
+	void               *ptrs[sizeof(sizes) / sizeof(sizes[0])];
 
 	for (int i = 0; i < n; i++) {
 		ptrs[i] = malloc(sizes[i]);
@@ -250,7 +250,7 @@ static void test_free_max_span_tiny(void)
 	SECTION("free of maximum-span TINY allocations (113–128 B, 8 chunks)");
 
 	static const size_t sizes[] = { 113, 120, 127, 128 };
-	const int           n       = 4;
+	const int           n       = (int)(sizeof(sizes) / sizeof(sizes[0]));
 
 	for (int i = 0; i < n; i++) {
 		void *p = malloc(sizes[i]);
@@ -321,7 +321,7 @@ static void test_interior_free(void)
 /* Section 7 — TINY zone exhaustion (spans two TINY zones)                    */
 /*                                                                            */
 /* One TINY zone is 4 pages = 16384 B. At 16 B/chunk that is 1024 chunks,     */
-/* of which ~1004 are usable (the header occupies NB_CHUNKS_TINY_HDR = 20).   */
+/* of which ~1002 are usable (the header occupies NB_CHUNKS_TINY_HDR = 22).   */
 /* Allocating 1100 chunks forces a second zone to be mmap'd. We verify:       */
 /* (1) all 1100 allocs succeed; (2) the byte patterns written to each are     */
 /* intact after all 1100 allocations, confirming no overlap across the zone   */
@@ -370,23 +370,23 @@ static void test_tiny_zone_exhaustion(void)
 /* -------------------------------------------------------------------------- */
 /* Section 8 — TINY zone release (empty zone is munmap'd)                     */
 /*                                                                            */
-/* Fill exactly one TINY zone (1004 usable 16-B chunks), then free them all.  */
+/* Fill exactly one TINY zone (1002 usable 16-B chunks), then free them all.  */
 /* free_tiny's bitmap scan must detect the zone is fully empty and call        */
 /* release_zone -> munmap. We print show_alloc_mem before and after so the     */
 /* developer can confirm the zone disappears, and verify a subsequent alloc    */
 /* creates a fresh zone.                                                       */
 /*                                                                            */
-/* 1024 chunks/zone - 20 header chunks = 1004 usable. This is white-box: it    */
+/* 1024 chunks/zone - 22 header chunks = 1002 usable. This is white-box: it    */
 /* depends on TINY_ZONE_SIZE=4*PAGE_SIZE, TINY_QUANTUM=16, and                */
-/* NB_CHUNKS_TINY_HDR=20.                                                      */
+/* NB_CHUNKS_TINY_HDR=22.                                                      */
 /* -------------------------------------------------------------------------- */
 
 static void test_tiny_zone_release(void)
 {
 	SECTION("TINY zone release — empty TINY zone is munmap'd");
 
-	const int capacity = 1004;
-	void     *ptrs[1004];
+	const int capacity = 1002;
+	void     *ptrs[1002];
 
 	for (int i = 0; i < capacity; i++)
 		ptrs[i] = malloc(16);
