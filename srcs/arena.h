@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/16 12:56:54 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/17 22:20:38 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/23 14:33:48 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,8 +19,15 @@
 #include <pthread.h>
 
 /**
+ * Fixed, bounded pool of arenas. Eight is a pragmatic compromise: enough to cut
+ * contention on common core counts, small enough that the trylock-hop fallback
+ * stays cheap.
+ */
+#define NB_ARENA_MAX 8
+
+/**
  * An arena is a shard of the allocator. There is a fixed, bounded pool of them
- * (g_arena); a thread merely derives a starting arena from its own id, it does
+ * (g_arenas); a thread merely derives a starting arena from its own id, it does
  * not own one. A single mutex per arena protects everything reachable from it:
  * its tiny/small zone lists, those zones' internal state, and the lifetime of
  * those zones (a zone is unlinked + munmap'd under this mutex). Because the
@@ -34,6 +41,17 @@ typedef struct arena {
 	s_small_zone   *small_hot; /* SMALL zone probed first on allocation */
 	pthread_mutex_t mutex; /* guards everything reachable above */
 } s_arena;
+
+/**
+ * Type of the single thread-safety global. Bundling the arena pool with its
+ * one-shot init guard keeps all thread-safety state in one global (g_arenas),
+ * as the subject requires. once_control drives init_arenas -- the explicit
+ * pthread_mutex_init of every arena mutex.
+ */
+typedef struct arenas {
+	pthread_once_t once_control; /* drives the one-time init_arenas */
+	s_arena        arena[NB_ARENA_MAX]; /* the fixed shard pool */
+} s_arenas;
 
 /**
  * @brief  Acquire an arena to allocate from, returned with its mutex *locked*.

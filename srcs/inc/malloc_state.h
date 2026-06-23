@@ -25,7 +25,7 @@
 
 /**
  * The single permitted global for allocation *state* (the second permitted
- * global, g_arena, holds the thread-safety shards). One instance,
+ * global, g_arenas, holds the thread-safety shards). One instance,
  * g_malloc_state, is initialized exactly once via pthread_once on the first
  * malloc/realloc.
  *

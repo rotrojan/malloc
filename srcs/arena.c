@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/16 12:58:34 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/17 22:54:19 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/23 14:34:02 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,16 +14,19 @@
 
 #include <pthread.h>
 
-/**
- * Fixed, bounded pool of arenas. Eight is a pragmatic compromise: enough to cut
- * contention on common core counts, small enough that the trylock-hop fallback
- * stays cheap. The array lives in BSS, so every mutex starts zero-initialized
- * -- a valid PTHREAD_MUTEX_INITIALIZER on glibc -- and needs no explicit init.
- */
-#define NB_ARENA_MAX 8
+/* The second (and last) permitted global: the thread-safety arena pool. */
+s_arenas g_arenas = { .once_control = PTHREAD_ONCE_INIT };
 
-/* The second (and last) permitted global: the thread-safety shard array. */
-s_arena g_arena[NB_ARENA_MAX];
+/**
+ * Initialize every arena mutex explicitly, fired once through
+ * g_arenas.once_control on the first get_arena -- the arena-pool analogue of
+ * init_malloc_state. The rest of g_arenas is zero-initialized at load time.
+ */
+static void init_arenas(void)
+{
+	for (size_t i = 0; i < NB_ARENA_MAX; i++)
+		pthread_mutex_init(&g_arenas.arena[i].mutex, NULL);
+}
 
 /**
  * Map a thread id to a home arena index. pthread_t on glibc is the address of
@@ -47,9 +50,12 @@ static uintptr_t get_home_arena_idx(pthread_t thread_id)
 s_arena *get_arena(void)
 {
 	s_arena *arena = NULL;
-	size_t   index = get_home_arena_idx(pthread_self()) % NB_ARENA_MAX;
+	size_t   idx;
 
-	arena = &g_arena[index];
+	pthread_once(&g_arenas.once_control, &init_arenas);
+
+	idx   = get_home_arena_idx(pthread_self()) % NB_ARENA_MAX;
+	arena = &g_arenas.arena[idx];
 
 	/* Fast path: home arena is uncontended. */
 	if (pthread_mutex_trylock(&arena->mutex) == 0)
@@ -61,8 +67,9 @@ s_arena *get_arena(void)
 	 */
 	for (int i = 1; i < NB_ARENA_MAX; i++) {
 		if (pthread_mutex_trylock(
-			    &g_arena[(index + i) % NB_ARENA_MAX].mutex) == 0)
-			return &g_arena[(index + i) % NB_ARENA_MAX];
+			    &g_arenas.arena[(idx + i) % NB_ARENA_MAX].mutex) ==
+		    0)
+			return &g_arenas.arena[(idx + i) % NB_ARENA_MAX];
 	}
 
 	/* Whole pool is busy: block on the home arena rather than spin. */

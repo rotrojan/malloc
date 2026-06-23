@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/23 02:14:58 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/23 13:43:06 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,9 +35,10 @@ s_malloc_state g_malloc_state = { .once_control = PTHREAD_ONCE_INIT };
 /**
  * One-time initialization, fired by pthread_once on the first malloc/realloc.
  * Records the address-space limit (RLIMIT_AS, treated as unbounded when
- * infinite) that the mmap wrapper enforces, the page size every zone is sized
- * against, and the registry mutex. The arena mutexes need no init here: they
- * live in BSS and zero is a valid PTHREAD_MUTEX_INITIALIZER on glibc.
+ * infinite) that the mmap wrapper enforces and the page size every zone is
+ * sized against, then explicitly initializes both leaf mutexes (list and stat).
+ * The arena mutexes are initialized separately, in init_arenas under their own
+ * pthread_once.
  */
 static void init_malloc_state(void)
 {
@@ -53,6 +54,7 @@ static void init_malloc_state(void)
 	g_malloc_state.page_size = sysconf(_SC_PAGESIZE);
 
 	pthread_mutex_init(&g_malloc_state.list_mutex, NULL);
+	pthread_mutex_init(&g_malloc_state.stat_mutex, NULL);
 }
 
 void *malloc(size_t size)
