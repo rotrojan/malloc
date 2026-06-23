@@ -91,11 +91,11 @@ Two layers of bookkeeping sit on top:
   doubly-linked list of *every* zone, used to map an arbitrary pointer back to
   the zone that owns it (`free`/`realloc`) and to walk everything for
   `show_alloc_mem`;
-- a fixed pool of **arenas** (`g_arena[8]`): independent shards, each with its
+- a fixed pool of eight **arenas** (`g_arenas`): independent shards, each with its
   own TINY/SMALL zones and its own lock, so threads rarely contend.
 
 There are exactly **two global variables**, as the subject requires: one for
-allocation state (`g_malloc_state`) and one for thread-safety (`g_arena`).
+allocation state (`g_malloc_state`) and one for thread-safety (`g_arenas`).
 
 ---
 
@@ -108,7 +108,7 @@ at least 100 allocations of its maximum size*:
 
 | Class | Request size  | Chunk model            | Zone size        | Max-size chunks/zone | ≥ 100? |
 |-------|---------------|------------------------|------------------|----------------------|--------|
-| TINY  | `0 … 128 B`   | 16 B granularity       | 4 pages (16 KB)  | 128 → ~1004 usable   | ✅     |
+| TINY  | `0 … 128 B`   | 16 B granularity       | 4 pages (16 KB)  | 128 → ~1002 usable   | ✅     |
 | SMALL | `129 … 2032 B`| 256 B quantum          | 64 pages (256 KB)| 127                  | ✅     |
 | LARGE | `> 2032 B`    | exact, page-rounded    | one mmap each    | n/a                  | n/a    |
 
@@ -116,8 +116,8 @@ Where the numbers come from (all assuming a 4 KB page):
 
 - **TINY ceiling = 128 B, granularity = 16 B.** A 128 B allocation spans
   `128 / 16 = 8` chunks — the maximum a single TINY allocation can occupy. A
-  4-page zone holds `16384 / 16 = 1024` chunks; the header eats the first 20, so
-  ~1004 are usable — comfortably ≥ 100 even at the 128 B maximum.
+  4-page zone holds `16384 / 16 = 1024` chunks; the header eats the first 22, so
+  ~1002 are usable — comfortably ≥ 100 even at the 128 B maximum.
 - **SMALL ceiling = 2032 B.** That's `8 × 256 − 2 × TAG_SIZE`: eight 256 B
   quanta minus the per-chunk boundary tags (8 B each). A 64-page zone has a
   261 888 B usable span; at the 2048 B maximum real chunk size that's 127
@@ -139,7 +139,7 @@ typedef struct zone_hdr {
     e_zone_type      type;      // TINY_ZONE | SMALL_ZONE | LARGE_ZONE
     size_t           size;      // total mapped bytes
     uintptr_t        self;      // == (uintptr_t)this header (detects relocation)
-    uint64_t         checksum;  // magic ^ type ^ self ^ size
+    uint64_t         checksum;  // magic ^ type ^ self ^ size ^ arena
     struct arena    *arena;     // owning arena (NULL for LARGE)
     struct zone_hdr *prev;      // global registry links (doubly-linked)
     struct zone_hdr *next;
@@ -158,7 +158,7 @@ before our hook was installed) fails these checks and is politely rejected to
 > single link pair can only thread a node through one list, so each zone carries
 > two. Both lists are doubly-linked, so a zone located by `find_zone` is
 > unlinked from both in **O(1)** on release. The XOR checksum deliberately
-> covers only `magic ^ type ^ self ^ size`, *not* the link pointers, so relinking
+> covers only `magic ^ type ^ self ^ size ^ arena`, *not* the link pointers, so relinking
 > never needs a checksum recompute.
 
 ---
@@ -249,7 +249,7 @@ the doubly-linked lists let a found zone be unlinked without a second walk.)
 
 ## Thread safety
 
-The allocator is sharded into a fixed pool of **8 arenas** (`g_arena`,
+The allocator is sharded into a fixed pool of **8 arenas** (`g_arenas`,
 `srcs/arena.c`). There is **no thread-local storage (TLS)**: a thread derives a home
 arena from a hash of its thread id (`get_home_arena_idx(pthread_self())` modulo
 the 8 arenas) and reaches it through `get_arena()`, which returns an arena
@@ -274,7 +274,7 @@ The locking contract in one line: **alloc may hop, free/realloc must go home.**
 lock the *owning* arena (`zone->arena`) — never `get_arena()` — because they
 target one specific existing zone.
 
-Because an arena's mutex lives in `g_arena` (which outlives every zone), it can
+Because an arena's mutex lives in `g_arenas` (which outlives every zone), it can
 be held *across* a zone's `munmap`. That is what lets reclamation be eager and
 need no tombstone flag: the **pin invariant** — a valid `free`/`realloc` holds a
 live pointer, so no other thread can empty or unmap that zone between
