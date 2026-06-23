@@ -6,18 +6,20 @@
 /*   By: rotrojan <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2019/10/13 03:11:10 by rotrojan          #+#    #+#             */
-/*   Updated: 2019/10/29 23:42:53 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/23 13:21:43 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "libft.h"
 
-void	*ft_memset(void *b, int c, size_t len)
+void *ft_memset(void *b, int c, size_t len)
 {
-	unsigned char	*tmp;
+	unsigned char *tmp;
 
-	tmp = (unsigned char*)b;
-	while (len--)
-		*(unsigned char*)tmp++ = c;
-	return (b);
+	tmp = b;
+
+	for (size_t i = 0; i < len; i++)
+		tmp[i] = c;
+
+	return b;
 }

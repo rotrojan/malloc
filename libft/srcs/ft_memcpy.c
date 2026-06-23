@@ -6,7 +6,7 @@
 /*   By: rotrojan <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2019/10/14 14:56:51 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/11 15:39:04 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/23 13:22:31 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,5 +23,5 @@ void *ft_memcpy(void *dst, void const *src, size_t n)
 	for (size_t i = 0; i < n; i++)
 		d[i] = s[i];
 
-	return (dst);
+	return dst;
 }
