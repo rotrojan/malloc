@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/22 14:18:10 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/22 21:02:13 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/23 15:13:32 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -98,7 +98,7 @@ static void print_tiny_zone(s_tiny_zone *zone, size_t *total_alloc)
 
 		j = 1;
 		while (i + j < BIT_ARRAY_SIZE(zone->in_use) &&
-		       j <= TINY_SIZE_MAX / TINY_QUANTUM &&
+		       j < TINY_SIZE_MAX / TINY_QUANTUM &&
 		       !bitmap_get_bit(zone->is_start, i + j) &&
 		       bitmap_get_bit(zone->in_use, i + j))
 			j++;
@@ -123,7 +123,8 @@ static void print_tiny_zone(s_tiny_zone *zone, size_t *total_alloc)
 void show_alloc_mem(void)
 {
 	s_zone_hdr *current;
-	size_t      total_alloc = 0;
+	size_t      total_alloc;
+	e_zone_type zone_type;
 
 	pthread_mutex_lock(&g_malloc_state.list_mutex);
 	current = g_malloc_state.zone_list;
@@ -132,18 +133,15 @@ void show_alloc_mem(void)
 		return;
 	}
 
+	total_alloc = 0;
 	while (current != NULL) {
-		switch (current->type) {
-		case TINY_ZONE:
+		zone_type = current->type;
+		if (zone_type == TINY_ZONE)
 			print_tiny_zone((s_tiny_zone *)current, &total_alloc);
-			break;
-		case SMALL_ZONE:
+		else if (zone_type == SMALL_ZONE)
 			print_small_zone((s_small_zone *)current, &total_alloc);
-			break;
-		default: /*LARGE_ZONE*/
+		else /* if (zone_type == LARGE_ZONE) */
 			print_large_zone((s_zone_hdr *)current, &total_alloc);
-			break;
-		}
 		current = current->next;
 	}
 	pthread_mutex_unlock(&g_malloc_state.list_mutex);

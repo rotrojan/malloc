@@ -226,7 +226,7 @@ void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	size_t       index;
 
 	pthread_mutex_lock(&arena->mutex);
-	old_needed_chunks = get_nb_chunks_tiny_alloc(ptr, (s_tiny_zone *)zone);
+	old_needed_chunks = get_nb_chunks_tiny_alloc(ptr, zone);
 
 	/* Growing past the class ceiling cannot stay TINY: fall back to a move.
 	 */

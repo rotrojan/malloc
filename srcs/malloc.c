@@ -150,14 +150,12 @@ void *realloc(void *ptr, size_t size)
 	 * Each worker locks the owning arena itself (the realloc lock contract,
 	 * symmetric to free); dispatch by the zone's class.
 	 */
-	switch (zone->type) {
-	case TINY_ZONE:
+	if (zone->type == TINY_ZONE)
 		return realloc_tiny(ptr, size, zone);
-	case SMALL_ZONE:
+	else if (zone->type == SMALL_ZONE)
 		return realloc_small(ptr, size, zone);
-	default:
+	else /* if (zone->type == LARGE_ZONE) */
 		return realloc_large(ptr, size, zone);
-	}
 }
 
 #ifdef EXTRA
@@ -199,8 +197,8 @@ void *reallocarray(void *ptr, size_t n, size_t size)
 {
 	/* Same overflow guard, then defer to realloc on the product. */
 	if (n != 0 && size > SIZE_MAX / n)
-		return (NULL);
+		return NULL;
 
-	return (realloc(ptr, n * size));
+	return realloc(ptr, n * size);
 }
 #endif

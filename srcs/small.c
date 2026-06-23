@@ -305,7 +305,8 @@ void *malloc_small(size_t size)
 	bin     = zone->bin;
 	bin_idx = BIN_IDX(real_size);
 
-	/** If the matching bin has an available chunk, pop it, mark it as
+	/**
+	 * If the matching bin has an available chunk, pop it, mark it as
 	 * IN_USE, and return it.
 	 */
 	if (bin[bin_idx] != NULL) {
