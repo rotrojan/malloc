@@ -1,6 +1,6 @@
 # Implicit variables
 CC = cc
-CFLAGS = -Wall -Wextra -Werror -I$(INCLUDE_DIR) -MMD -MP
+CFLAGS = -Wall -Wextra -Werror -I$(INCLUDE_DIR) -MMD -MP -fPIC
 AR = ar
 ARFLAGS = rcs
 RM = rm -fr
