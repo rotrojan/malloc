@@ -6,7 +6,7 @@
 /*   By: rotrojan <rotrojan@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/19 14:36:30 by rotrojan          #+#    #+#             */
-/*   Updated: 2026/06/23 13:43:06 by rotrojan         ###   ########.fr       */
+/*   Updated: 2026/06/24 01:12:38 by rotrojan         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -160,18 +160,19 @@ void *realloc(void *ptr, size_t size)
 
 #ifdef EXTRA
 /**
- * calloc and reallocarray are not part of the subject. They are compiled in
- * only under -DEXTRA (make EXTRA=1), purely to run real programs (e.g. vim)
- * entirely on this allocator.
+ * calloc, reallocarray and malloc_usable_size are not part of the subject. They
+ * are compiled in only under -DEXTRA (make EXTRA=1), so the default build
+ * exports exactly the subject's malloc/free/realloc (+ show_alloc_mem); EXTRA
+ * widens the surface enough to run real programs (e.g. ls, vim) on this
+ * allocator.
  *
- * They are opt-in, and off by default, because exporting calloc under
- * LD_PRELOAD is dangerous: any library in the process (e.g. nss-systemd during
- * `ls -la` group-name resolution) that calls calloc() receives a pointer from
- * our heap, and when glibc later inspects it via malloc_usable_size() (called
- * internally before deciding whether to realloc) it parses our pointer as a
- * glibc chunk header and crashes. A default build therefore exports only
- * malloc/free/realloc and lets the dynamic linker fall through to glibc for
- * calloc; EXTRA builds accept that risk in exchange for fuller interposition.
+ * malloc_usable_size is the load-bearing one. Because we interpose
+ * malloc/realloc, every live pointer in the process is ours, so any code that
+ * then calls malloc_usable_size on one (e.g. systemd's nss greedy_realloc
+ * during `ls -l` group lookup) would otherwise reach glibc's version, which
+ * reads the bytes before our pointer as a glibc chunk header and walks off into
+ * unmapped memory. Interposing it keeps glibc out of our heap;
+ * calloc/reallocarray round out the surface for programs that call them.
  */
 
 void *calloc(size_t n, size_t size)
@@ -200,5 +201,38 @@ void *reallocarray(void *ptr, size_t n, size_t size)
 		return NULL;
 
 	return realloc(ptr, n * size);
+}
+
+/**
+ * Usable bytes in the allocation at `ptr` -- the per-class chunk capacity,
+ * which is always >= the original request. Dispatches by zone type like
+ * free/realloc (LARGE needs no arena lock); returns 0 for NULL or a pointer we
+ * do not own.
+ */
+size_t malloc_usable_size(void *ptr)
+{
+	s_zone_hdr *zone;
+	s_arena    *arena;
+	size_t      ret;
+
+	if (ptr == NULL)
+		return 0;
+	zone = find_zone(ptr);
+	if (zone == NULL)
+		return 0;
+
+	if (zone->type == LARGE_ZONE)
+		return zone->size - sizeof(s_zone_hdr);
+
+	arena = zone->arena;
+	pthread_mutex_lock(&arena->mutex);
+	if (zone->type == TINY_ZONE)
+		ret = get_nb_chunks_tiny_alloc(ptr, (s_tiny_zone *)zone) *
+		      TINY_QUANTUM;
+	else /* if (zone->type == SMALL_ZONE) */
+		ret = GET_SIZE(CHUNK_HDR(ptr)) - 2 * TAG_SIZE;
+	pthread_mutex_unlock(&arena->mutex);
+
+	return ret;
 }
 #endif

@@ -110,9 +110,9 @@ new_zone:
  * Count how many consecutive chunks the allocation starting at `ptr` spans.
  * Walk forward over in_use bits, stopping at the next is_start (the next
  * allocation), at a free chunk, at the 8-chunk class maximum, or at the end of
- * the bitmap. Shared by free_tiny and realloc_tiny, which need the old extent.
+ * the bitmap. Shared by free_tiny, realloc_tiny, and malloc_usable_size.
  */
-static size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone)
+size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone)
 {
 	size_t nb_chunks = 1;
 	size_t index     = (ptr - (char *)zone) / TINY_QUANTUM;

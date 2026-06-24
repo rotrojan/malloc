@@ -95,4 +95,17 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr);
  */
 void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr);
 
+/**
+ * @brief      Count the 16-byte chunks the allocation at `ptr` spans (1..8).
+ *
+ * Walks the in_use bitmap from `ptr`'s chunk, stopping at the next is_start, a
+ * free chunk, the class maximum, or the bitmap end. Used by free_tiny,
+ * realloc_tiny (the old extent) and malloc_usable_size.
+ *
+ * @param ptr  A pointer returned by malloc_tiny (an allocation's first chunk).
+ * @param zone The owning TINY zone.
+ * @return     The chunk count (1..8).
+ */
+size_t get_nb_chunks_tiny_alloc(char *ptr, s_tiny_zone *zone);
+
 #endif /* TINY_H */

@@ -47,7 +47,8 @@ LD_PRELOAD=./libft_malloc.so ls -l
 ```
 
 Larger programs work too — but only with an `EXTRA` build, which also provides
-`calloc`/`reallocarray` (see [Design choices](#design-choices--trade-offs)):
+`calloc`/`reallocarray`/`malloc_usable_size` (see
+[Design choices](#design-choices--trade-offs)):
 
 ```sh
 make EXTRA=1
@@ -55,7 +56,8 @@ LD_PRELOAD=./libft_malloc.so vim
 ```
 
 A default build exports exactly four symbols: `malloc`, `free`, `realloc`,
-`show_alloc_mem` (an `EXTRA` build adds `calloc` and `reallocarray`).
+`show_alloc_mem` (an `EXTRA` build adds `calloc`, `reallocarray` and
+`malloc_usable_size`).
 `show_alloc_mem()` prints every live allocation, grouped by zone and sorted by
 increasing address:
 
@@ -305,13 +307,13 @@ A naïve shared library would export *everything* with external linkage — the
 internal workers, the bitmap helpers, all of libft, even the globals. A linker
 **version script** (`libft_malloc.map`, wired with `-Wl,--version-script`) marks
 the public symbols `global` (`malloc`, `free`, `realloc`, `show_alloc_mem`, plus
-`calloc`/`reallocarray` in an `EXTRA` build) and everything else `local`. The
-map lists `calloc`/`reallocarray` unconditionally; the linker simply ignores
-them in a default build where they are not compiled, so only four symbols are
-exported. Verify with:
+`calloc`/`reallocarray`/`malloc_usable_size` in an `EXTRA` build) and everything
+else `local`. The map lists the three `EXTRA` symbols unconditionally; the linker
+simply ignores them in a default build where they are not compiled, so only four
+symbols are exported. Verify with:
 
 ```sh
-nm -D --defined-only libft_malloc.so   # → the four public symbols (six with EXTRA)
+nm -D --defined-only libft_malloc.so   # → the four public symbols (seven with EXTRA)
 ```
 
 A version script (rather than `-fvisibility=hidden`) is used because it also
@@ -349,14 +351,18 @@ static-link time and never needed dynamic export.
 - **Eager `munmap` with no tombstone flag.** Justified by the pin invariant
   described under [Thread safety](#thread-safety); it keeps the resident set
   tight without a deferred-reclaim scheme.
-- **`calloc`/`reallocarray` are opt-in (`make EXTRA=1`), off by default.** They
-  are not part of the subject, and exporting `calloc` under `LD_PRELOAD` is
-  risky: glibc internals (for example, name-service lookups during `ls -l`) hand
-  our pointers back into `malloc_usable_size()`, which parses them as glibc
-  chunks and crashes. So a default build omits them and lets the dynamic linker
-  fall through to glibc. An `EXTRA` build (`-DEXTRA`) compiles and exports them,
-  accepting that risk in exchange for running larger programs such as `vim` end
-  to end on the allocator.
+- **`calloc`/`reallocarray`/`malloc_usable_size` are opt-in (`make EXTRA=1`), off
+  by default.** They are not part of the subject, so a default build exports only
+  the four required symbols and lets the dynamic linker fall through to glibc for
+  the rest. `malloc_usable_size` is the load-bearing one: because we interpose
+  `malloc`/`realloc`, every live pointer in the process is ours, so when glibc
+  internals introspect one (for example, name-service lookups during `ls -l` call
+  `malloc_usable_size()` while deciding whether to `realloc`) glibc's own version
+  would read the bytes before our pointer as a chunk header and walk off into
+  unmapped memory. Interposing it keeps glibc out of our heap; `calloc` and
+  `reallocarray` round out the surface for programs that call them. An `EXTRA`
+  build (`-DEXTRA`) compiles and exports all three, enough to run larger programs
+  such as `vim` or `ls -l` end to end on the allocator.
 
 ### Strengths
 

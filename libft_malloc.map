@@ -6,6 +6,7 @@
 		show_alloc_mem;
 		calloc;
 		reallocarray;
+		malloc_usable_size;
 	local:
 		*;
 };
