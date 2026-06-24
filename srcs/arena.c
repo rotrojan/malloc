@@ -12,7 +12,9 @@
 
 #include "arena.h"
 
+#include <limits.h> /* for CHAR_BIT */
 #include <pthread.h>
+#include <stdint.h> /* for uintptr_t */
 
 /* The second (and last) permitted global: the thread-safety arena pool. */
 s_arenas g_arenas = { .once_control = PTHREAD_ONCE_INIT };
