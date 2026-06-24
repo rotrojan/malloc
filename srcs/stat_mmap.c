@@ -12,6 +12,7 @@
 
 #include "malloc_state.h"
 
+#include <pthread.h>
 #include <sys/mman.h>
 #include <unistd.h> /* for STDERR_FILENO */
 
