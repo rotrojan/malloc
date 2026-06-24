@@ -337,20 +337,43 @@ void *malloc_small(size_t size)
 	return NULL;
 }
 
-int small_ptr_is_valid(void *ptr)
+int small_ptr_is_valid(void *ptr, s_small_zone *zone)
 {
+	uintptr_t ptr_int  = (uintptr_t)ptr;
+	uintptr_t zone_int = (uintptr_t)zone;
+	size_t    size;
+
 	/* A real SMALL pointer is 256-aligned; anything else is foreign. */
-	if ((uintptr_t)ptr & (SMALL_QUANTUM - 1))
+	if (ptr_int & (SMALL_QUANTUM - 1))
 		return 0;
 
 	/**
-	 * A live allocation's header reads IN_USE and matches its footer. A
-	 * FREE header is a double-free (or never-malloced); a header/footer
-	 * mismatch means the pointer is not a real chunk start (interior or
-	 * foreign) -- the boundary-tag analog of TINY's is_start check.
+	 * The header (ptr - TAG_SIZE) always lies inside the zone, so reading
+	 * it is safe. A FREE header is a double-free or a never-malloced
+	 * pointer.
 	 */
-	return GET_STATE(CHUNK_HDR(ptr)) != FREE &&
-	       GET_TAG(CHUNK_HDR(ptr)) == GET_TAG(CHUNK_FTR(ptr));
+	if (GET_STATE(CHUNK_HDR(ptr)) == FREE)
+		return 0;
+
+	/**
+	 * The header size is untrusted for an interior pointer, yet CHUNK_FTR
+	 * derives the footer address from it. Bound it so the footer's tag word
+	 * stays inside the zone (which also keeps ptr_int + size from wrapping)
+	 * before dereferencing it: a garbage size would otherwise read off the
+	 * mapping.
+	 */
+	size = GET_SIZE(CHUNK_HDR(ptr));
+	if (size < 2 * TAG_SIZE || size > SMALL_ZONE_SIZE)
+		return 0;
+	if (ptr_int + size - TAG_SIZE > zone_int + SMALL_ZONE_SIZE)
+		return 0;
+
+	/**
+	 * Header and footer tags agree only at a real chunk start; a mismatch
+	 * means an interior or foreign pointer -- the boundary-tag analog of
+	 * TINY's is_start check.
+	 */
+	return GET_TAG(CHUNK_HDR(ptr)) == GET_TAG(CHUNK_FTR(ptr));
 }
 
 void free_small(void *ptr, s_zone_hdr *zone_hdr)
@@ -360,7 +383,7 @@ void free_small(void *ptr, s_zone_hdr *zone_hdr)
 	s_free_list  *freed = NULL;
 
 	/* Reject misaligned, interior, double-freed and foreign pointers. */
-	if (!small_ptr_is_valid(ptr)) {
+	if (!small_ptr_is_valid(ptr, zone)) {
 		return ft_dprintf(STDERR_FILENO,
 				  "Fatal: invalid pointer passed to free!\n"
 				  "%p: pointer was never malloced.\n",
@@ -399,7 +422,7 @@ void *realloc_small(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	pthread_mutex_lock(&arena->mutex);
 
 	/* Reject misaligned, interior, double-freed and foreign pointers. */
-	if (!small_ptr_is_valid(ptr)) {
+	if (!small_ptr_is_valid(ptr, zone)) {
 		pthread_mutex_unlock(&arena->mutex);
 		ft_dprintf(STDERR_FILENO,
 			   "Fatal: invalid pointer passed to realloc!\n"

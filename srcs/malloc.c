@@ -230,7 +230,8 @@ size_t malloc_usable_size(void *ptr)
 	    tiny_ptr_is_valid(ptr, (s_tiny_zone *)zone))
 		ret = get_nb_chunks_tiny_alloc(ptr, (s_tiny_zone *)zone) *
 		      TINY_QUANTUM;
-	else if (zone->type == SMALL_ZONE && small_ptr_is_valid(ptr))
+	else if (zone->type == SMALL_ZONE &&
+		 small_ptr_is_valid(ptr, (s_small_zone *)zone))
 		ret = GET_SIZE(CHUNK_HDR(ptr)) - 2 * TAG_SIZE;
 	else
 		ret = 0;

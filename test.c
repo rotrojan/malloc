@@ -719,6 +719,23 @@ static void test_realloc_invalid(void)
 		      check_pattern(sa, 512, 0x5C));
 		free(sa);
 	}
+
+	/* Aligned-interior SMALL pointer: 256-aligned but inside a larger chunk,
+	 * so not a chunk start. Poison the word it would read as a header with a
+	 * huge IN_USE size; before the footer-bounds fix, small_ptr_is_valid
+	 * derived CHUNK_FTR from that size and read off the mapping (OOB). */
+	char *sb = malloc(2000); /* 256-aligned, one 2048 B chunk */
+	CHECK("SMALL alloc for aligned-interior realloc test", sb != NULL);
+	if (sb != NULL) {
+		fill_pattern(sb, 240, 0x6D);
+		/* The header word an interior sb + 256 reads: huge size, IN_USE. */
+		*(size_t *)(sb + 256 - sizeof(size_t)) = (size_t)0x10000001;
+		void *ri = call_realloc(sb + 256, 600);
+		CHECK("realloc(aligned-interior SMALL ptr) returns NULL", ri == NULL);
+		CHECK("aligned-interior realloc leaves the block head intact",
+		      check_pattern(sb, 240, 0x6D));
+		free(sb);
+	}
 }
 
 /* -------------------------------------------------------------------------- */
@@ -770,6 +787,18 @@ static void test_free_edge_cases(void)
 	void *si = malloc(512);
 	call_free((char *)si + 8);
 	CHECK("SMALL interior free is rejected", 1);
+
+	/* SMALL aligned-interior pointer: 256-aligned but inside a larger chunk.
+	 * Poison the header word it would read with a huge IN_USE size; the
+	 * footer-bounds check in small_ptr_is_valid must reject it instead of
+	 * reading off the mapping. */
+	void *sai = malloc(2000);
+	if (sai != NULL) {
+		*(size_t *)((char *)sai + 256 - sizeof(size_t)) = (size_t)0x10000001;
+		call_free((char *)sai + 256);
+		CHECK("SMALL aligned-interior free is rejected without crashing", 1);
+		free(sai);
+	}
 
 	/* LARGE double free (zone already unmapped on the first free). */
 	void *lp = malloc(5000);
