@@ -29,8 +29,9 @@
  * g_malloc_state, is initialized exactly once via pthread_once on the first
  * malloc/realloc.
  *
- * It owns the global, address-ordered registry of every live zone and the two
- * leaf mutexes of the locking design:
+ * It owns the global, address-ordered registry of every live zone and two of
+ * the three mutexes in the arena -> list -> stat lock order (the third is the
+ * per-arena mutex in g_arenas):
  *   - list_mutex guards the zone_list registry. It also serializes LARGE-zone
  *     header mutation: a LARGE zone has no arena (hence no per-arena mutex), so
  *     when realloc_large shrinks one in place it mutates the header under this
