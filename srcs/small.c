@@ -59,9 +59,9 @@ static s_small_zone *new_small_zone(s_arena *arena)
 	/* prologue */
 	PUT_TAG(CHUNK_HDR(prologue), TAG(2 * TAG_SIZE, IN_USE));
 	PUT_TAG(CHUNK_FTR(prologue), TAG(2 * TAG_SIZE, IN_USE));
-	/* epilogue header (epilogue has no footer)*/
+	/* epilogue header (epilogue has no footer) */
 	PUT_TAG(CHUNK_HDR(epilogue), TAG(0, IN_USE));
-	/* first free chunk (wild chunk)*/
+	/* first free chunk (wild chunk) */
 	PUT_TAG(CHUNK_HDR(wild_chunk),
 		TAG(SMALL_ZONE_SIZE - SMALL_QUANTUM, FREE));
 	PUT_TAG(CHUNK_FTR(wild_chunk),

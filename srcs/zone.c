@@ -247,7 +247,7 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone)
  * NOTE: this function is an admission of failure!
  * The initial idea was to get the address of the page with a oneliner bitwise
  * operation (page_addr = ptr_addr & ~(PAGE_SIZE - 1)), then backward pagewalk
- * from there until either the zone header is found. This allows finding the
+ * from there until the zone header is found. This allows finding the
  * zone of any malloc'ed pointer without keeping track of it.
  * Unfortunately, before the LD_PRELOAD hook occurs, some allocation can be
  * performed by the glibc (for instance, when invoking `ls -l`), which
@@ -259,7 +259,7 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone)
  * Other solutions were possible, but they either added some considerable
  * limitations and overhead (like a hash table indexing all zone headers),
  * required more syscalls (like making the zones zone-aligned instead of
- * page-aligned, which could have been done by performing a bigger`mmap()` and
+ * page-aligned, which could have been done by performing a bigger `mmap()` and
  * then trimming the head and the tail with two `munmap()`) or used a forbidden
  * function to be sure that the page was resident in memory (`man mincore`).
  */

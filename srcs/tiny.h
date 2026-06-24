@@ -40,7 +40,7 @@
 /**
  * Four pages (16 KB where the page is 4 KB). The subject requires a zone to fit
  * at least 100 allocations at the class's max size: 16384 / 128 = 128 max-size
- * chunks, comfortably above 100 even after the header is deducted (~1004 of the
+ * chunks, comfortably above 100 even after the header is deducted (~1002 of the
  * smallest 16-byte chunks remain usable).
  */
 #define TINY_ZONE_SIZE (PAGE_SIZE * 4)

@@ -43,7 +43,9 @@ void *malloc_large(size_t size)
 	size_t real_size = large_zone_size(size);
 	void  *zone;
 
-	/* 0 means the request is unsatisfiable (the rounding would overflow). */
+	/**
+	 * 0 means the request is unsatisfiable (the rounding would overflow).
+	 */
 	if (real_size == 0)
 		return NULL;
 

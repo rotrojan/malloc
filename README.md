@@ -470,7 +470,7 @@ Three independent suites:
 
 ```
 include/malloc.h          public prototypes (malloc/free/realloc)
-libft_malloc.map          linker version script (the 4 exported symbols)
+libft_malloc.map          linker version script (4 default exports, +3 EXTRA)
 Makefile                  build, run_test, run_test_mt, run_test_oom
 srcs/
   malloc.c                public malloc/free/realloc, init, dispatch
