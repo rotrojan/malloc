@@ -206,8 +206,8 @@ void *reallocarray(void *ptr, size_t n, size_t size)
 /**
  * Usable bytes in the allocation at `ptr` -- the per-class chunk capacity,
  * which is always >= the original request. Dispatches by zone type like
- * free/realloc (LARGE needs no arena lock); returns 0 for NULL or a pointer we
- * do not own.
+ * free/realloc (LARGE needs no arena lock); returns 0 for NULL, a pointer we
+ * do not own, or an interior/misaligned pointer into one of our zones.
  */
 size_t malloc_usable_size(void *ptr)
 {
@@ -226,11 +226,14 @@ size_t malloc_usable_size(void *ptr)
 
 	arena = zone->arena;
 	pthread_mutex_lock(&arena->mutex);
-	if (zone->type == TINY_ZONE)
+	if (zone->type == TINY_ZONE &&
+	    tiny_ptr_is_valid(ptr, (s_tiny_zone *)zone))
 		ret = get_nb_chunks_tiny_alloc(ptr, (s_tiny_zone *)zone) *
 		      TINY_QUANTUM;
-	else /* if (zone->type == SMALL_ZONE) */
+	else if (zone->type == SMALL_ZONE && small_ptr_is_valid(ptr))
 		ret = GET_SIZE(CHUNK_HDR(ptr)) - 2 * TAG_SIZE;
+	else
+		ret = 0;
 	pthread_mutex_unlock(&arena->mutex);
 
 	return ret;

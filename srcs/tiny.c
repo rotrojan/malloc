@@ -161,38 +161,40 @@ void *malloc_tiny(size_t size)
 	return (char *)zone + index * TINY_QUANTUM;
 }
 
+int tiny_ptr_is_valid(void *ptr, s_tiny_zone *zone)
+{
+	uintptr_t ptr_int = (uintptr_t)ptr;
+	size_t    index;
+
+	/* A real TINY pointer is chunk-aligned; anything else is foreign. */
+	if (ptr_int & (TINY_QUANTUM - 1))
+		return 0;
+
+	/**
+	 * Must be both in use and an allocation start: rejects double frees
+	 * (chunk no longer in_use) and interior pointers (in_use but not an
+	 * is_start). find_zone has already bounded ptr inside the zone.
+	 */
+	index = (ptr_int - (uintptr_t)zone) / TINY_QUANTUM;
+	return bitmap_get_bit(zone->in_use, index) &&
+	       bitmap_get_bit(zone->is_start, index);
+}
+
 void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 {
-	uintptr_t    ptr_int  = (uintptr_t)ptr;
-	s_tiny_zone *zone     = (s_tiny_zone *)zone_hdr;
-	uintptr_t    zone_int = (uintptr_t)zone_hdr;
+	s_tiny_zone *zone = (s_tiny_zone *)zone_hdr;
 	size_t       index;
 	size_t       nb_chunks;
 
-	/* A real TINY pointer is chunk-aligned; anything else is foreign. */
-	if (ptr_int & (TINY_QUANTUM - 1)) {
-		return ft_dprintf(STDERR_FILENO,
-				  "Fatal: invalid pointer passed to free!\n"
-				  "%p: pointer is not aligned.\n",
-				  ptr);
-	}
-
-	index = (ptr_int - zone_int) / TINY_QUANTUM;
-
-	/**
-	 * Must be both in use and the start of an allocation. This rejects
-	 * double-frees (chunk no longer in_use) and interior pointers (in_use
-	 * but not an is_start), the bitmap analog of SMALL's tag symmetry
-	 * check.
-	 */
-	if (!bitmap_get_bit(zone->in_use, index) ||
-	    !bitmap_get_bit(zone->is_start, index)) {
+	/* Reject misaligned, interior and double-freed pointers up front. */
+	if (!tiny_ptr_is_valid(ptr, zone)) {
 		return ft_dprintf(STDERR_FILENO,
 				  "Fatal: invalid pointer passed to free!\n"
 				  "%p: pointer was never malloced.\n",
 				  ptr);
 	}
 
+	index     = ((uintptr_t)ptr - (uintptr_t)zone) / TINY_QUANTUM;
 	nb_chunks = get_nb_chunks_tiny_alloc(ptr, zone);
 
 	bitmap_clear_range(zone->in_use, index, nb_chunks);
@@ -226,9 +228,23 @@ void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	size_t       index;
 
 	pthread_mutex_lock(&arena->mutex);
+
+	/**
+	 * Reject misaligned, interior and double-freed pointers (as free does).
+	 */
+	if (!tiny_ptr_is_valid(ptr, zone)) {
+		pthread_mutex_unlock(&arena->mutex);
+		ft_dprintf(STDERR_FILENO,
+			   "Fatal: invalid pointer passed to realloc!\n"
+			   "%p: pointer was never malloced.\n",
+			   ptr);
+		return NULL;
+	}
+
 	old_needed_chunks = get_nb_chunks_tiny_alloc(ptr, zone);
 
-	/* Growing past the class ceiling cannot stay TINY: fall back to a move.
+	/**
+	 * Growing past the class ceiling cannot stay TINY: fall back to a move.
 	 */
 	if (size > TINY_SIZE_MAX)
 		goto new_alloc;

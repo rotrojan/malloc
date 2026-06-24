@@ -671,22 +671,54 @@ static void test_realloc_large(void)
 }
 
 /* -------------------------------------------------------------------------- */
-/* Section 16 — realloc: invalid / foreign pointer                            */
+/* Section 16 — realloc: invalid / foreign / interior pointer                 */
 /*                                                                            */
-/* realloc of a pointer we never handed out (here, static storage) must be     */
-/* rejected: find_zone returns NULL, realloc prints a diagnostic and returns   */
-/* NULL without touching the foreign memory or aborting. call_realloc hides    */
-/* the pointer's origin from -Werror=free-nonheap-object.                      */
+/* realloc of a pointer we never handed out must be rejected (NULL) without    */
+/* aborting or corrupting state. Three cases: a foreign pointer (static        */
+/* storage -> find_zone NULL); an interior TINY pointer (aligned and in a      */
+/* valid zone's range, but not an is_start chunk); and a misaligned interior   */
+/* SMALL pointer. The interior cases regress the gap where realloc trusted     */
+/* find_zone and skipped the per-allocation validation free performs, then     */
+/* corrupted the real neighbouring allocation. call_realloc hides the          */
+/* pointer's origin from -Werror=free-nonheap-object.                          */
 /* -------------------------------------------------------------------------- */
 
 static void test_realloc_invalid(void)
 {
-	SECTION("realloc — invalid/foreign pointer is rejected");
+	SECTION("realloc — invalid/foreign/interior pointer is rejected");
 
 	static char foreign[64];
 
 	void *r = call_realloc(foreign, 100);
 	CHECK("realloc(foreign ptr, n) returns NULL without aborting", r == NULL);
+
+	/* Interior TINY pointer: aligned and in-range, but the 2nd chunk of a
+	 * 4-chunk block, so not an allocation start. */
+	char *ta = malloc(64);
+	char *tb = malloc(64);
+	CHECK("TINY allocs for interior-realloc test", ta != NULL && tb != NULL);
+	if (ta != NULL && tb != NULL) {
+		fill_pattern(ta, 64, 0x3A);
+		fill_pattern(tb, 64, 0x3B);
+		void *ti = call_realloc(ta + 16, 80);
+		CHECK("realloc(interior TINY ptr) returns NULL", ti == NULL);
+		CHECK("rejected interior TINY realloc leaves neighbours intact",
+		      check_pattern(ta, 64, 0x3A) && check_pattern(tb, 64, 0x3B));
+		free(ta);
+		free(tb);
+	}
+
+	/* Interior SMALL pointer: not SMALL_QUANTUM-aligned. */
+	char *sa = malloc(512);
+	CHECK("SMALL alloc for interior-realloc test", sa != NULL);
+	if (sa != NULL) {
+		fill_pattern(sa, 512, 0x5C);
+		void *si = call_realloc(sa + 8, 600);
+		CHECK("realloc(interior SMALL ptr) returns NULL", si == NULL);
+		CHECK("rejected interior SMALL realloc leaves the block intact",
+		      check_pattern(sa, 512, 0x5C));
+		free(sa);
+	}
 }
 
 /* -------------------------------------------------------------------------- */

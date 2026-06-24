@@ -337,29 +337,30 @@ void *malloc_small(size_t size)
 	return NULL;
 }
 
+int small_ptr_is_valid(void *ptr)
+{
+	/* A real SMALL pointer is 256-aligned; anything else is foreign. */
+	if ((uintptr_t)ptr & (SMALL_QUANTUM - 1))
+		return 0;
+
+	/**
+	 * A live allocation's header reads IN_USE and matches its footer. A
+	 * FREE header is a double-free (or never-malloced); a header/footer
+	 * mismatch means the pointer is not a real chunk start (interior or
+	 * foreign) -- the boundary-tag analog of TINY's is_start check.
+	 */
+	return GET_STATE(CHUNK_HDR(ptr)) != FREE &&
+	       GET_TAG(CHUNK_HDR(ptr)) == GET_TAG(CHUNK_FTR(ptr));
+}
+
 void free_small(void *ptr, s_zone_hdr *zone_hdr)
 {
 	size_t        size;
 	s_small_zone *zone  = (s_small_zone *)zone_hdr;
 	s_free_list  *freed = NULL;
 
-	/* A real SMALL pointer is 256-aligned; anything else is foreign. */
-	if ((uintptr_t)ptr & (SMALL_QUANTUM - 1)) {
-		return ft_dprintf(STDERR_FILENO,
-				  "Fatal: invalid pointer passed to free!\n"
-				  "%p: pointer is not aligned.\n",
-				  ptr);
-	}
-
-	/**
-	 * Validate before touching anything. A live allocation's header reads
-	 * IN_USE and matches its footer. A FREE header is a double-free (or
-	 * never-malloced); a header/footer mismatch means the pointer is not a
-	 * real chunk start (interior or foreign) -- the boundary-tag analog of
-	 * TINY's is_start check.
-	 */
-	if (GET_STATE(CHUNK_HDR(ptr)) == FREE ||
-	    GET_TAG(CHUNK_HDR(ptr)) != GET_TAG(CHUNK_FTR(ptr))) {
+	/* Reject misaligned, interior, double-freed and foreign pointers. */
+	if (!small_ptr_is_valid(ptr)) {
 		return ft_dprintf(STDERR_FILENO,
 				  "Fatal: invalid pointer passed to free!\n"
 				  "%p: pointer was never malloced.\n",
@@ -396,6 +397,17 @@ void *realloc_small(void *ptr, size_t size, s_zone_hdr *zone_hdr)
 	s_arena      *arena     = zone_hdr->arena;
 
 	pthread_mutex_lock(&arena->mutex);
+
+	/* Reject misaligned, interior, double-freed and foreign pointers. */
+	if (!small_ptr_is_valid(ptr)) {
+		pthread_mutex_unlock(&arena->mutex);
+		ft_dprintf(STDERR_FILENO,
+			   "Fatal: invalid pointer passed to realloc!\n"
+			   "%p: pointer was never malloced.\n",
+			   ptr);
+		return NULL;
+	}
+
 	old_real_size = GET_SIZE(CHUNK_HDR(ptr));
 
 	/**

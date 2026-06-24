@@ -96,6 +96,21 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr);
 void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr);
 
 /**
+ * @brief      Reject a pointer not returned by malloc_tiny.
+ *
+ * Valid means TINY_QUANTUM-aligned and pointing at an allocation's first chunk
+ * (its bit is set in both in_use and is_start). Rejects misaligned, interior
+ * and double-freed pointers -- the shared check behind free_tiny, realloc_tiny
+ * and malloc_usable_size.
+ *
+ * @param ptr  Candidate pointer, already located in @p zone by find_zone.
+ * @param zone The owning TINY zone.
+ * @return     1 if @p ptr is a live allocation start, 0 otherwise.
+ * @note Assumes the owning arena's mutex is held by the caller.
+ */
+int tiny_ptr_is_valid(void *ptr, s_tiny_zone *zone);
+
+/**
  * @brief      Count the 16-byte chunks the allocation at `ptr` spans (1..8).
  *
  * Walks the in_use bitmap from `ptr`'s chunk, stopping at the next is_start, a

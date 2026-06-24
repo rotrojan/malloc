@@ -151,4 +151,18 @@ void free_small(void *ptr, s_zone_hdr *zone_hdr);
  */
 void *realloc_small(void *ptr, size_t size, s_zone_hdr *zone_hdr);
 
+/**
+ * @brief     Reject a pointer not returned by malloc_small.
+ *
+ * Valid means SMALL_QUANTUM-aligned, its header reads IN_USE, and its header
+ * and footer tags agree (the boundary-tag analog of TINY's is_start check).
+ * Rejects misaligned, interior, double-freed and foreign pointers -- the
+ * shared check behind free_small, realloc_small and malloc_usable_size.
+ *
+ * @param ptr Candidate pointer, already located in its zone by find_zone.
+ * @return    1 if @p ptr is a live chunk start, 0 otherwise.
+ * @note Assumes the owning arena's mutex is held by the caller.
+ */
+int small_ptr_is_valid(void *ptr);
+
 #endif /* SMALL_H */
