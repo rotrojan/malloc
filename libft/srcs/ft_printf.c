@@ -48,7 +48,7 @@ static void buffer_putstr(s_buffer *buffer, const char *s)
 
 static void buffer_putdecimal(s_buffer *buffer, int n)
 {
-	char         tmp[12];
+	char         tmp[12]; /* int: up to 10 digits + NUL (i starts at 11) */
 	int          i = 11;
 	unsigned int u;
 

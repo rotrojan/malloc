@@ -245,7 +245,7 @@ static int zone_is_valid(void *ptr, s_zone_hdr *zone)
 
 /**
  * NOTE: this function is an admission of failure!
- * The initial idea was to get the address of the page with a oneliner bitwise
+ * The initial idea was to get the address of the page with a one-liner bitwise
  * operation (page_addr = ptr_addr & ~(PAGE_SIZE - 1)), then backward pagewalk
  * from there until the zone header is found. This allows finding the
  * zone of any malloc'ed pointer without keeping track of it.

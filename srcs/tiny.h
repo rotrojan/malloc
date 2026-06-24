@@ -79,7 +79,7 @@ void *malloc_tiny(size_t size);
  * @brief          Free a TINY allocation; releases the zone if it empties.
  * @param ptr      Pointer returned by malloc_tiny. Misaligned, interior, or
  *                 never-allocated pointers are rejected to stderr without
- * abort.
+ *                 abort.
  * @param zone_hdr The owning zone (already located by find_zone).
  * @note Assumes the owning arena's mutex is held by the caller.
  */

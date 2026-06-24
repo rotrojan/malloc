@@ -39,6 +39,12 @@ static int g_fail = 0;
 
 #define SECTION(name) ft_printf("\n=== %s ===\n", name)
 
+/* Poisoned SMALL header word for the aligned-interior rejection tests: after
+ * GET_SIZE masks the low 3 bits the size reads as 0x10000000 (far above
+ * SMALL_ZONE_SIZE) while bit 0 marks it IN_USE, so small_ptr_is_valid must
+ * reject it on the size bound *before* dereferencing the footer. */
+#define POISON_BIG_INUSE ((size_t)0x10000001)
+
 static int is_aligned(void *ptr, size_t align)
 {
 	return ptr != NULL && ((uintptr_t)ptr % align) == 0;
@@ -729,7 +735,7 @@ static void test_realloc_invalid(void)
 	if (sb != NULL) {
 		fill_pattern(sb, 240, 0x6D);
 		/* The header word an interior sb + 256 reads: huge size, IN_USE. */
-		*(size_t *)(sb + 256 - sizeof(size_t)) = (size_t)0x10000001;
+		*(size_t *)(sb + 256 - sizeof(size_t)) = POISON_BIG_INUSE;
 		void *ri = call_realloc(sb + 256, 600);
 		CHECK("realloc(aligned-interior SMALL ptr) returns NULL", ri == NULL);
 		CHECK("aligned-interior realloc leaves the block head intact",
@@ -794,7 +800,7 @@ static void test_free_edge_cases(void)
 	 * reading off the mapping. */
 	void *sai = malloc(2000);
 	if (sai != NULL) {
-		*(size_t *)((char *)sai + 256 - sizeof(size_t)) = (size_t)0x10000001;
+		*(size_t *)((char *)sai + 256 - sizeof(size_t)) = POISON_BIG_INUSE;
 		call_free((char *)sai + 256);
 		CHECK("SMALL aligned-interior free is rejected without crashing", 1);
 		free(sai);

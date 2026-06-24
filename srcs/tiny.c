@@ -29,10 +29,10 @@
 #define NO_USABLE_INDEX SIZE_MAX
 
 /**
- * Create and initialize a fresh TINY zone in `arena`. new_zone has already
- * zeroed nothing in particular, so clear both bitmaps and seed the free-chunk
- * hint past the header chunks (the header occupies the first NB_CHUNKS_TINY_HDR
- * chunks and must never be allocated over).
+ * Create and initialize a fresh TINY zone in `arena`. new_zone only stamps the
+ * header and does not zero the bitmap area, so clear both bitmaps and seed the
+ * free-chunk hint past the header chunks (the header occupies the first
+ * NB_CHUNKS_TINY_HDR chunks and must never be allocated over).
  */
 static s_tiny_zone *new_tiny_zone(s_arena *arena)
 {
