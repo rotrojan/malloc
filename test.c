@@ -332,6 +332,8 @@ static void test_interior_free(void)
 /* (1) all 1100 allocs succeed; (2) the byte patterns written to each are     */
 /* intact after all 1100 allocations, confirming no overlap across the zone   */
 /* boundary; (3) a fresh alloc works after freeing everything.                */
+/* Freeing all empties both zones; with K = 1 retention one is kept as the    */
+/* arena spare and the other is munmap'd (the surplus-release path).          */
 /* -------------------------------------------------------------------------- */
 
 static void test_tiny_zone_exhaustion(void)
@@ -374,22 +376,25 @@ static void test_tiny_zone_exhaustion(void)
 }
 
 /* -------------------------------------------------------------------------- */
-/* Section 8 — TINY zone release (empty zone is munmap'd)                     */
+/* Section 8 — TINY zone retention (emptied zone kept as the arena spare)     */
 /*                                                                            */
 /* Fill exactly one TINY zone (1002 usable 16-B chunks), then free them all.  */
-/* free_tiny's bitmap scan must detect the zone is fully empty and call        */
-/* release_zone -> munmap. We print show_alloc_mem before and after so the     */
-/* developer can confirm the zone disappears, and verify a subsequent alloc    */
-/* creates a fresh zone.                                                       */
+/* free_tiny's bitmap scan detects the zone is fully empty; with K = 1        */
+/* hysteresis the lone empty zone is kept as the arena's spare (not munmap'd) */
+/* so the next alloc reuses it instead of thrashing mmap. A retained empty    */
+/* zone has no live allocations, so show_alloc_mem lists nothing for it; a    */
+/* subsequent alloc still succeeds by reusing the spare. The surplus-release  */
+/* (munmap) path is covered by section 7 (two zones freed -> one kept, one    */
+/* released); the thrash-avoidance itself is measured via evaluation/test2.   */
 /*                                                                            */
-/* 1024 chunks/zone - 22 header chunks = 1002 usable. This is white-box: it    */
+/* 1024 chunks/zone - 22 header chunks = 1002 usable. This is white-box: it   */
 /* depends on TINY_ZONE_SIZE=4*PAGE_SIZE, TINY_QUANTUM=16, and                */
-/* NB_CHUNKS_TINY_HDR=22.                                                      */
+/* NB_CHUNKS_TINY_HDR=22.                                                     */
 /* -------------------------------------------------------------------------- */
 
 static void test_tiny_zone_release(void)
 {
-	SECTION("TINY zone release — empty TINY zone is munmap'd");
+	SECTION("TINY zone retention — emptied zone kept as the arena spare");
 
 	const int capacity = 1002;
 	void     *ptrs[1002];
@@ -406,12 +411,12 @@ static void test_tiny_zone_release(void)
 		free(ptrs[i]);
 
 	if (show_alloc_mem) {
-		ft_printf("After freeing all (expect empty):\n");
+		ft_printf("After freeing all (retained empty zone, nothing live):\n");
 		show_alloc_mem();
 	}
 
 	void *p = malloc(16);
-	CHECK("alloc succeeds after TINY zone release", p != NULL);
+	CHECK("alloc succeeds after TINY zone retention (reuses spare)", p != NULL);
 	free(p);
 }
 
@@ -425,6 +430,8 @@ static void test_tiny_zone_release(void)
 /* We verify: (1) all 1100 allocs succeed; (2) byte patterns are intact after */
 /* all allocations (no cross-zone overlap); (3) a fresh alloc works after      */
 /* freeing everything.                                                        */
+/* Freeing all empties both zones; with K = 1 retention one is kept as the    */
+/* arena spare and the other is munmap'd (the surplus-release path).          */
 /* -------------------------------------------------------------------------- */
 
 static void test_small_zone_exhaustion(void)
@@ -467,19 +474,23 @@ static void test_small_zone_exhaustion(void)
 }
 
 /* -------------------------------------------------------------------------- */
-/* Section 10 — SMALL zone release (empty zone is munmap'd)                   */
+/* Section 10 — SMALL zone retention (emptied zone kept as the arena spare)   */
 /*                                                                            */
-/* Fill exactly one SMALL zone then free all. free_small detects the zone is   */
-/* empty when the coalesced free chunk equals SMALL_ZONE_SIZE - SMALL_QUANTUM  */
-/* (261888 B) and calls release_zone -> munmap.                                */
+/* Fill one SMALL zone then free all. free_small detects the zone is empty    */
+/* when the coalesced free chunk equals SMALL_ZONE_SIZE - SMALL_QUANTUM       */
+/* (261888 B); with K = 1 hysteresis it keeps this lone empty zone as the     */
+/* arena's spare (not munmap'd, the wild chunk re-binned) so the next alloc   */
+/* reuses it. A subsequent alloc still succeeds by reusing the spare; the     */
+/* surplus-release (munmap) path is covered by section 9; evaluation/test2    */
+/* measures the thrash-avoidance.                                             */
 /*                                                                            */
 /* Each 129-byte request rounds up to real_size=256 B; 261888 / 256 = 1023    */
-/* exactly, so one zone holds exactly 1023 such allocs.                        */
+/* exactly, so one zone holds exactly 1023 such allocs.                       */
 /* -------------------------------------------------------------------------- */
 
 static void test_small_zone_release(void)
 {
-	SECTION("SMALL zone release — empty SMALL zone is munmap'd");
+	SECTION("SMALL zone retention — emptied zone kept as the arena spare");
 
 	const int capacity = 1023;
 	void     *ptrs[1023];
@@ -496,12 +507,12 @@ static void test_small_zone_release(void)
 		free(ptrs[i]);
 
 	if (show_alloc_mem) {
-		ft_printf("After freeing all (expect empty):\n");
+		ft_printf("After freeing all (retained empty zone, nothing live):\n");
 		show_alloc_mem();
 	}
 
 	void *p = malloc(129);
-	CHECK("alloc succeeds after SMALL zone release", p != NULL);
+	CHECK("alloc succeeds after SMALL zone retention (reuses spare)", p != NULL);
 	free(p);
 }
 
@@ -1007,7 +1018,8 @@ static void test_show_alloc_mem(void)
 	free(s1);
 	free(l1);
 
-	ft_printf("After freeing all (expect empty output):\n");
+	ft_printf("After freeing all (expect no live allocations, just the Total "
+		  "line):\n");
 	show_alloc_mem();
 	CHECK("show_alloc_mem after full free ran without crashing", 1);
 }

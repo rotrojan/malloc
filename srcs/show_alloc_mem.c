@@ -50,18 +50,23 @@ static void print_large_zone(s_zone_hdr *zone, size_t *total_alloc)
  * each header's size field), printing only the IN_USE chunks. The walk starts
  * at the first real chunk (past the prologue quantum) and stops at the
  * epilogue. Reported size is the chunk's total tagged size, matching the
- * subject's "allocated memory zone" reading.
+ * subject's "allocated memory zone" reading. The zone header line is printed
+ * lazily, before the first IN_USE chunk, so a retained empty zone (see arena.h)
+ * prints nothing.
  */
 static void print_small_zone(s_small_zone *zone, size_t *total_alloc)
 {
 	uintptr_t zone_addr = (uintptr_t)zone;
 	size_t    size_alloc;
-	uintptr_t ptr = zone_addr + SMALL_QUANTUM;
-
-	ft_printf("SMALL : %p\n", (void *)zone_addr);
+	uintptr_t ptr            = zone_addr + SMALL_QUANTUM;
+	int       header_printed = 0;
 
 	while (ptr < zone_addr + SMALL_ZONE_SIZE) {
 		if (GET_STATE(CHUNK_HDR((char *)ptr)) == IN_USE) {
+			if (!header_printed) {
+				ft_printf("SMALL : %p\n", (void *)zone_addr);
+				header_printed = 1;
+			}
 			size_alloc = GET_SIZE(CHUNK_HDR((char *)ptr));
 			ft_printf("%p - %p : %zu bytes\n", (void *)ptr,
 				  (void *)(ptr + size_alloc - 1), size_alloc);
@@ -77,7 +82,9 @@ static void print_small_zone(s_small_zone *zone, size_t *total_alloc)
  * chunks and any free gaps. The inner loop then measures the allocation's span
  * `j` by counting consecutive in_use chunks up to (but not including) the next
  * is_start, the 8-chunk class maximum, or the bitmap end -- the same extent
- * rule free_tiny uses. The printed range covers j whole 16-byte chunks.
+ * rule free_tiny uses. The printed range covers j whole 16-byte chunks. The
+ * zone header line is printed lazily, before the first allocation, so a
+ * retained empty zone (see arena.h) prints nothing.
  */
 static void print_tiny_zone(s_tiny_zone *zone, size_t *total_alloc)
 {
@@ -87,13 +94,16 @@ static void print_tiny_zone(s_tiny_zone *zone, size_t *total_alloc)
 	uintptr_t start_alloc;
 	uintptr_t end_alloc;
 	size_t    size_alloc;
-
-	ft_printf("TINY : %p\n", (void *)zone_addr);
+	int       header_printed = 0;
 
 	while (i < BIT_ARRAY_SIZE(zone->is_start)) {
 		if (!bitmap_get_bit(zone->is_start, i)) {
 			i++;
 			continue;
+		}
+		if (!header_printed) {
+			ft_printf("TINY : %p\n", (void *)zone_addr);
+			header_printed = 1;
 		}
 
 		j = 1;

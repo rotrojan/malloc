@@ -147,6 +147,14 @@ void *malloc_tiny(size_t size)
 	}
 
 	/**
+	 * Allocating into the retained empty spare consumes it; drop the spare
+	 * so the next zone to empty can take its place (zone retention, see
+	 * arena.h).
+	 */
+	if (zone == arena->tiny_spare)
+		arena->tiny_spare = NULL;
+
+	/**
 	 * Claim the run: mark every chunk in_use, flag the first as the
 	 * allocation start. The hint can only move right past consumed space,
 	 * but a smaller index may have been freed since, so keep the minimum.
@@ -182,7 +190,8 @@ int tiny_ptr_is_valid(void *ptr, s_tiny_zone *zone)
 
 void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 {
-	s_tiny_zone *zone = (s_tiny_zone *)zone_hdr;
+	s_tiny_zone *zone  = (s_tiny_zone *)zone_hdr;
+	s_arena     *arena = zone_hdr->arena;
 	size_t       index;
 	size_t       nb_chunks;
 
@@ -204,10 +213,8 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 	zone->index_next_free_chunk = MIN(zone->index_next_free_chunk, index);
 
 	/**
-	 * If the whole zone is now free, hand it back to the OS. The zone is
-	 * empty exactly when every in_use word is zero. Releasing eagerly keeps
-	 * idle memory from accumulating; the arena mutex (held by the caller)
-	 * makes this safe to do under the pin invariant.
+	 * The zone is empty exactly when every in_use word is zero. A non-empty
+	 * zone keeps serving allocations, so there is nothing more to do.
 	 */
 	for (size_t i = 0; i < ARRAY_SIZE(zone->in_use); i++) {
 		if (zone->in_use[i]) {
@@ -215,7 +222,17 @@ void free_tiny(void *ptr, s_zone_hdr *zone_hdr)
 		}
 	}
 
-	release_zone(zone_hdr);
+	/**
+	 * Empty zone: keep it as the arena's spare so a malloc/free oscillation
+	 * reuses it instead of thrashing mmap/munmap. If a spare is already
+	 * held, this one is surplus -- hand it back to the OS (zone retention,
+	 * K = 1; see arena.h). The arena mutex (held by the caller) makes the
+	 * release safe under the pin invariant.
+	 */
+	if (arena->tiny_spare == NULL)
+		arena->tiny_spare = zone;
+	else
+		release_zone(zone_hdr);
 }
 
 void *realloc_tiny(void *ptr, size_t size, s_zone_hdr *zone_hdr)

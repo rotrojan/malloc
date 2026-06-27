@@ -33,12 +33,23 @@
  * those zones (a zone is unlinked + munmap'd under this mutex). Because the
  * mutex lives in the arena (which outlives every zone), it can be held across a
  * zone's munmap.
+ *
+ * Zone retention (hysteresis, K = 1). Rather than munmap a TINY/SMALL zone the
+ * instant its last allocation is freed, the arena keeps *one* emptied zone of
+ * each class as a spare (tiny_spare / small_spare). A malloc/free workload that
+ * oscillates around a zone boundary then reuses the spare instead of thrashing
+ * mmap/munmap on every cycle. A zone that empties while a spare is already held
+ * is munmap'd, capping idle memory at one empty zone per class per arena. The
+ * spare stays linked in its list (so the normal allocation scan finds it) and
+ * is cleared the moment an allocation lands in it.
  */
 typedef struct arena {
 	s_tiny_zone    *tiny_list; /* this arena's TINY zones (doubly-linked) */
 	s_tiny_zone    *tiny_hot; /* TINY zone probed first on allocation */
+	s_tiny_zone    *tiny_spare; /* lone empty TINY zone kept for reuse */
 	s_small_zone   *small_list; /* this arena's SMALL zones */
 	s_small_zone   *small_hot; /* SMALL zone probed first on allocation */
+	s_small_zone   *small_spare; /* lone empty SMALL zone kept for reuse */
 	pthread_mutex_t mutex; /* guards everything reachable above */
 } s_arena;
 

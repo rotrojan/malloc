@@ -302,6 +302,14 @@ void *malloc_small(size_t size)
 		return NULL;
 	}
 
+	/**
+	 * Allocating into the retained empty spare consumes it; drop the spare
+	 * so the next zone to empty can take its place (zone retention, see
+	 * arena.h).
+	 */
+	if (zone == arena->small_spare)
+		arena->small_spare = NULL;
+
 	bin     = zone->bin;
 	bin_idx = BIN_IDX(real_size);
 
@@ -380,6 +388,7 @@ void free_small(void *ptr, s_zone_hdr *zone_hdr)
 {
 	size_t        size;
 	s_small_zone *zone  = (s_small_zone *)zone_hdr;
+	s_arena      *arena = zone_hdr->arena;
 	s_free_list  *freed = NULL;
 
 	/* Reject misaligned, interior, double-freed and foreign pointers. */
@@ -399,12 +408,17 @@ void free_small(void *ptr, s_zone_hdr *zone_hdr)
 	size  = GET_SIZE(CHUNK_HDR(freed));
 
 	/**
-	 * If coalescing reconstituted the whole wild chunk, the zone is empty:
-	 * hand it back to the OS instead of re-binning. Otherwise file the
-	 * freed chunk in its size class.
+	 * If coalescing reconstituted the whole wild chunk, the zone is empty.
+	 * Keep it as the arena's spare so a malloc/free oscillation reuses it
+	 * rather than thrashing mmap/munmap; the wild chunk is re-binned below
+	 * so it can be carved again. If a spare is already held, this zone is
+	 * surplus and is handed back to the OS (zone retention, K = 1; see
+	 * arena.h).
 	 */
 	if (size == SMALL_ZONE_SIZE - SMALL_QUANTUM) {
-		return release_zone(zone_hdr);
+		if (arena->small_spare != NULL)
+			return release_zone(zone_hdr);
+		arena->small_spare = zone;
 	}
 
 	add_to_bin(freed, &zone->bin[BIN_IDX(size)]);

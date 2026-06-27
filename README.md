@@ -189,7 +189,9 @@ Allocation is a **first-fit** search for `ceil(size/16)` consecutive zero bits
 of set bits a byte at a time. `is_start` lets `free` recover an allocation's
 length (count consecutive `in_use && !is_start` chunks) and reject a pointer
 that lands in the *middle* of an allocation. When a free empties the whole
-`in_use` bitmap, the zone is `munmap`'d immediately.
+`in_use` bitmap, the zone is kept as the arena's lone spare for reuse rather
+than unmapped — a one-zone hysteresis that avoids mmap/munmap churn on a
+`malloc`/`free` ping-pong (see [Design choices](#design-choices--trade-offs)).
 
 ### SMALL — boundary tags + segregated bins
 
@@ -216,7 +218,10 @@ This boundary-tag technique is the central idea borrowed from CS:APP.
 Free chunks are held in **9 segregated bins** by size class (256 B … 2048 B,
 plus one oversized bin). A fresh zone starts as a single "wild" chunk filling
 the whole zone in the oversized bin; allocation splits it, `free` re-inserts and
-coalesces. A zone is released when a coalesce reconstitutes the full wild chunk.
+coalesces. When a coalesce reconstitutes the full wild chunk the zone is empty;
+it is then kept as the arena's lone spare for reuse, or unmapped if a spare is
+already held (one-zone hysteresis — see
+[Design choices](#design-choices--trade-offs)).
 
 `free_small` validates aggressively before touching anything: the pointer must
 be `SMALL_QUANTUM`-aligned, its header must read `IN_USE` (catches
@@ -277,12 +282,12 @@ lock the *owning* arena (`zone->arena`) — never `get_arena()` — because they
 target one specific existing zone.
 
 Because an arena's mutex lives in `g_arenas` (which outlives every zone), it can
-be held *across* a zone's `munmap`. That is what lets reclamation be eager and
-need no tombstone flag: the **pin invariant** — a valid `free`/`realloc` holds a
-live pointer, so no other thread can empty or unmap that zone between
-`find_zone` returning and the owning arena being locked. One arena lock covers
-both the allocation scan and reclamation, closing the race between allocating
-into a zone and another thread reclaiming it.
+be held *across* a zone's `munmap`. That is what lets a zone be reclaimed — or
+kept back as the arena's spare — with no tombstone flag: the **pin invariant** —
+a valid `free`/`realloc` holds a live pointer, so no other thread can empty or
+unmap that zone between `find_zone` returning and the owning arena being locked.
+One arena lock covers both the allocation scan and reclamation, closing the race
+between allocating into a zone and another thread reclaiming it.
 
 This model is validated under `valgrind --tool=helgrind`: 16 threads (more than
 the 8 arenas, to force contention and the trylock-hop path), a churn phase, then
@@ -348,9 +353,14 @@ static-link time and never needed dynamic export.
   so `ptr & ~(ZONE_SIZE - 1)` is the header) costs an over-map plus two trimming
   `munmap`s per zone, against the syscall budget. The address-ordered list keeps
   zone creation at a single `mmap` and pays only on lookup.
-- **Eager `munmap` with no tombstone flag.** Justified by the pin invariant
-  described under [Thread safety](#thread-safety); it keeps the resident set
-  tight without a deferred-reclaim scheme.
+- **Zone retention (one-zone hysteresis).** A TINY/SMALL zone is *not* unmapped
+  the instant it empties; each arena keeps one empty zone of each class as a
+  spare and reuses it, unmapping only once a *second* zone of that class goes
+  idle. This turns a `malloc`/`free` ping-pong around a zone boundary from two
+  syscalls per iteration into in-zone reuse with no syscall. Reclamation still
+  needs no tombstone flag: the pin invariant under
+  [Thread safety](#thread-safety) means the surplus zone cannot be unmapped from
+  under a live `free`/`realloc`.
 - **`calloc`/`reallocarray`/`malloc_usable_size` are opt-in (`make EXTRA=1`), off
   by default.** They are not part of the subject, so a default build exports only
   the four required symbols and lets the dynamic linker fall through to glibc for
@@ -415,17 +425,6 @@ static-link time and never needed dynamic export.
   reuse instead of unmapping, and/or `madvise(MADV_DONTNEED)` to release physical
   pages while retaining the virtual mapping — trading a little memory for far
   fewer syscalls.
-- **Eager release churns syscalls at the empty/full boundary.** Emptied TINY/SMALL
-  zones are unmapped immediately (the footprint-first trade under
-  [Design choices](#design-choices--trade-offs)), so a workload that repeatedly
-  drives a single zone across the empty/full line pays an `munmap` then an `mmap`
-  every cycle. The pathological case is a single-chunk `malloc`/`free`
-  ping-pong: each `free` empties the only zone and unmaps it, and the next
-  `malloc` has to map a fresh one — turning what could be two pointer writes into
-  two syscalls per iteration.
-  *Fix:* give each arena a one-zone hysteresis — retain the first emptied zone as
-  a spare and only `munmap` once a *second* zone goes idle — so the common
-  boundary crossing reuses the spare without a syscall.
 - **SMALL bins are singly-linked, and the oversized bin is first-fit.**
   Insertion and pop (`add_to_bin`/`pop_from_bin`) are O(1); only
   `remove_from_bin` — called from `coalesce`/`resize_chunk` on the free path —
