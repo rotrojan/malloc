@@ -361,6 +361,31 @@ static-link time and never needed dynamic export.
   needs no tombstone flag: the pin invariant under
   [Thread safety](#thread-safety) means the surplus zone cannot be unmapped from
   under a live `free`/`realloc`.
+- **Releasing memory at exit is left to the OS.** The allocator installs **no
+  teardown hook** — `atexit` isn't in the allowed set, and a
+  `__attribute__((destructor))` is the only remaining door — so it never walks
+  its structures at process exit to `munmap` what is still mapped: the retained
+  spare zones, or a caller's un-freed allocations. The tempting instinct is the
+  opposite. The original design eagerly `munmap`'d every zone the moment it
+  emptied, precisely so the process never sat on memory it had not released; once
+  hysteresis began *deliberately* keeping zones around, the same instinct called
+  for a destructor to hand them all back at the end. That instinct conflates two
+  different things. A *leak* is allocated memory that has become **unreachable**;
+  a retained spare is still linked in `g_malloc_state.zone_list` (and in its
+  arena's `*_spare`), so it is reachable and releasable on demand — a cache, not
+  a leak. And the final release is already guaranteed: on process exit the kernel
+  tears down the whole address space, unmapping every zone whether or not we did
+  it first, so an exit-time `munmap` sweep is **bit-for-bit redundant** with what
+  the OS is about to do. It is in fact worse than redundant: destructors run
+  while other threads may still be live and other libraries' destructors may
+  still call `free()`, so unmapping our zones early would open a use-after-free
+  window to accomplish nothing the kernel won't do for free. Nor is there a leak
+  report to satisfy — a memory checker interposes its *own* `malloc`, so it never
+  sees our internal `mmap` regions. No production allocator does exit-time cache
+  release either: glibc's `__libc_freeres` exists only to quiet valgrind and
+  matters only on `dlclose`, which never happens to an `LD_PRELOAD` allocator
+  that lives for the whole process. The OS is the correct, guaranteed, zero-cost
+  backstop for the final release, so the right thing to do at exit is **nothing**.
 - **`calloc`/`reallocarray`/`malloc_usable_size` are opt-in (`make EXTRA=1`), off
   by default.** They are not part of the subject, so a default build exports only
   the four required symbols and lets the dynamic linker fall through to glibc for
